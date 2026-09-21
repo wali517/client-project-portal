@@ -8,6 +8,10 @@ import { ALLOWED_MIME_TYPES } from '../constants/files.js';
 
 fs.mkdirSync(env.uploadDir, { recursive: true });
 
+const uploadDir = env.isProduction
+  ? '/tmp/cpm-portal-uploads'
+  : env.uploadDir;
+  
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, env.uploadDir),
   filename: (_req, file, cb) => {
