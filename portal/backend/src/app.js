@@ -89,5 +89,20 @@ app.use(notFoundHandler);
  * Global error handler
  */
 app.use(errorHandler);
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.js"
+    }
+  ]
+}
 
 export default app;
