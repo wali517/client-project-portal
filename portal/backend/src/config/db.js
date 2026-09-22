@@ -4,8 +4,14 @@ import logger from '../utils/logger.js';
 
 mongoose.set('strictQuery', true);
 export const connectDB = async (uri = env.mongoUri) => {
-  const connection = await mongoose.connect(uri, { autoIndex: !env.isProduction });
-  logger.info(`MongoDB connected: ${connection.connection.host}/${connection.connection.name}`);
+  const connection = await mongoose.connect(uri, {
+    autoIndex: !env.isProduction
+  });
+
+  logger.info(
+    `MongoDB connected: ${connection.connection.host}/${connection.connection.name}`
+  );
+
   return connection;
 };
 

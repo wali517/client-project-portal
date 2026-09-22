@@ -1,25 +1,22 @@
-import app from './app.js';
-import env from './config/env.js';
-import connectDB from './config/db.js';
-import logger from './utils/logger.js';
+import app from '../src/app.js';
+import connectDB from '../src/config/db.js';
 
-const start = async () => {
+let dbPromise;
+
+export default async function handler(req, res) {
   try {
-    await connectDB();
-    const server = app.listen(env.port, () => {
-      logger.info(`API listening on http://localhost:${env.port} (${env.nodeEnv})`);
-    });
+    if (!dbPromise) {
+      dbPromise = connectDB();
+    }
 
-    const shutdown = (signal) => {
-      logger.info(`${signal} received, shutting down`);
-      server.close(() => process.exit(0));
-    };
-    process.on('SIGINT', () => shutdown('SIGINT'));
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    await dbPromise;
+
+    return app(req, res);
   } catch (error) {
-    logger.error('Failed to start server:', error.message);
-    process.exit(1);
+    console.error('MongoDB connection failed:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Database connection failed',
+    });
   }
-};
-
-start();
+}
