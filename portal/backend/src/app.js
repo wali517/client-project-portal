@@ -20,13 +20,16 @@ app.set('trust proxy', 1);
 const allowedOrigins = [
   'http://localhost:5173',
   'https://frontend-theta-khaki-99.vercel.app',
-  'https://frontend-swart-alpha-21.vercel.app',
 ];
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  if (allowedOrigins.includes(origin)) {
+  const isVercelFrontend =
+    origin &&
+    /^https:\/\/frontend-[a-z0-9-]+\.vercel\.app$/.test(origin);
+
+  if (allowedOrigins.includes(origin) || isVercelFrontend) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   }
