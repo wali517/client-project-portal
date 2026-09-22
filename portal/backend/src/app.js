@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 
@@ -25,26 +24,30 @@ app.set('trust proxy', 1);
  */
 const frontendOrigin = 'https://frontend-theta-khaki-99.vercel.app';
 
-app.use(
-  cors({
-    origin: frontendOrigin,
-    credentials: true,
-    methods: [
-      'GET',
-      'HEAD',
-      'PUT',
-      'PATCH',
-      'POST',
-      'DELETE',
-      'OPTIONS',
-    ],
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-    ],
-    optionsSuccessStatus: 204,
-  })
-);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  if (origin === frontendOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', frontendOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+
+  res.setHeader(
+    'Access-Control-Allow-Methods',
+    'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS'
+  );
+
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type,Authorization'
+  );
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
 
 /**
  * Request body parsing
