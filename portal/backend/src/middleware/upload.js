@@ -6,7 +6,9 @@ import env from '../config/env.js';
 import ApiError from '../utils/ApiError.js';
 import { ALLOWED_MIME_TYPES } from '../constants/files.js';
 
-const uploadDir = env.isProduction
+const isVercel = Boolean(process.env.VERCEL);
+
+const uploadDir = isVercel
   ? '/tmp/cpm-portal-uploads'
   : env.uploadDir;
 
