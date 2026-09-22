@@ -44,7 +44,9 @@ app.use(
     ],
     optionsSuccessStatus: 204,
   })
-);/**
+);
+
+/**
  * Request body parsing
  */
 app.use(express.json({ limit: '1mb' }));
