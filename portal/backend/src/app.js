@@ -15,15 +15,13 @@ const app = express();
 app.set('trust proxy', 1);
 
 /**
- * Allowed frontend origins.
- *
- * CLIENT_URL can contain multiple comma-separated URLs.
- * The current production frontend is also included explicitly
- * so CORS continues to work even if the Vercel environment
- * variable has not been updated yet.
+ * Allowed frontend origin
  */
 const frontendOrigin = 'https://frontend-theta-khaki-99.vercel.app';
 
+/**
+ * CORS
+ */
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
@@ -48,6 +46,11 @@ app.use((req, res, next) => {
 
   next();
 });
+
+/**
+ * Security
+ */
+app.use(helmet());
 
 /**
  * Request body parsing
@@ -89,20 +92,5 @@ app.use(notFoundHandler);
  * Global error handler
  */
 app.use(errorHandler);
-{
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/index.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/index.js"
-    }
-  ]
-}
 
 export default app;
