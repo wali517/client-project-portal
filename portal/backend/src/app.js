@@ -20,6 +20,7 @@ app.set('trust proxy', 1);
 const allowedOrigins = [
   'http://localhost:5173',
   'https://frontend-theta-khaki-99.vercel.app',
+  'https://frontend-swart-alpha-21.vercel.app',
 ];
 
 app.use((req, res, next) => {
