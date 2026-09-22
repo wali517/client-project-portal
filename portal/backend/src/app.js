@@ -17,16 +17,16 @@ app.set('trust proxy', 1);
 /**
  * Allowed frontend origin
  */
-const frontendOrigin = 'https://frontend-theta-khaki-99.vercel.app';
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://frontend-theta-khaki-99.vercel.app',
+];
 
-/**
- * CORS
- */
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  if (origin === frontendOrigin) {
-    res.setHeader('Access-Control-Allow-Origin', frontendOrigin);
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   }
 
