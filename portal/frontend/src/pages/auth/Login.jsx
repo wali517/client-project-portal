@@ -24,8 +24,7 @@ const Login = () => {
     try {
       const user = await login(values);
       toast.success(`Welcome back, ${user.name.split(' ')[0]}`);
-      const from = location.state?.from?.pathname;
-      navigate(from && from !== '/login' ? from : homePathFor(user), { replace: true });
+      navigate(homePathFor(user), { replace: true });
     } catch (error) {
       toast.error(getErrorMessage(error, 'Those details did not match an account.'));
     } finally {

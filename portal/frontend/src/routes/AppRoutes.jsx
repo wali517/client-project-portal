@@ -79,7 +79,7 @@ const AppRoutes = () => (
           <Route path="/client/projects/:id" element={<ClientProjectDetail />} />
         </Route>
 
-        <Route path="/unauthorized" element={<Unauthorized />} />
+        <Route path="/unauthorized" element={<Navigate to="/" replace />} />
       </Route>
     </Route>
 

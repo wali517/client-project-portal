@@ -97,14 +97,6 @@ const ProjectActions = ({ project, user, onChanged, onDeleted }) => {
     );
   }
 
-  if (isAdmin(user)) {
-    actions.push(
-      <Button key="delete" variant="danger" icon={Trash2} onClick={() => setDialog('delete')}>
-        Delete
-      </Button>
-    );
-  }
-
   if (!actions.length) return null;
 
   return (

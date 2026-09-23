@@ -7,6 +7,7 @@ const revisionSchema = new mongoose.Schema(
     project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
     requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     requestedByRole: { type: String, enum: ROLE_VALUES, required: true },
+    targetRole: { type: String, enum: ROLE_VALUES },
     reason: { type: String, required: true, trim: true, maxlength: 2000 },
     instructions: { type: String, trim: true, maxlength: 4000, default: '' },
     status: { type: String, enum: REVISION_STATUS_VALUES, default: REVISION_STATUS.OPEN, index: true },

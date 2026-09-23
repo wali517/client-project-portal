@@ -33,9 +33,16 @@ export const getFile = asyncHandler(async (req, res) => {
 });
 
 export const downloadFile = asyncHandler(async (req, res) => {
-  const { file, filePath } = await fileService.getFileStreamPath(req.params.id, req.user);
+  const { file, filePath, buffer } = await fileService.getFileStreamPath(req.params.id, req.user);
+  const isInline = req.query.inline === 'true';
+  const dispositionType = isInline ? 'inline' : 'attachment';
+
   res.setHeader('Content-Type', file.mimeType);
-  res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.originalName)}"`);
+  res.setHeader('Content-Disposition', `${dispositionType}; filename="${encodeURIComponent(file.originalName)}"`);
+
+  if (buffer) {
+    return res.send(buffer);
+  }
   return res.sendFile(path.resolve(filePath));
 });
 

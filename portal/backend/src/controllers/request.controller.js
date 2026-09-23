@@ -44,7 +44,6 @@ export const approveRequest = asyncHandler(async (req, res) => {
 export const rejectRequest = asyncHandler(async (req, res) => {
   const request = await requestService.changeRequestStatus(req.params.id, REQUEST_STATUS.REJECTED, req.user, {
     rejectionReason: req.body.reason,
-    note: req.body.reason,
   });
   return sendSuccess(res, { message: 'Request rejected', data: request });
 });

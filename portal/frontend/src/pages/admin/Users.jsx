@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Trash2 } from 'lucide-react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
@@ -13,10 +13,12 @@ import Table from '../../components/ui/Table.jsx';
 import FilterBar from '../../components/ui/FilterBar.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import DataState from '../../components/ui/DataState.jsx';
+import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
 import { TableSkeleton } from '../../components/ui/Skeleton.jsx';
 import UserForm from '../../components/users/UserForm.jsx';
 import usePaginatedList from '../../hooks/usePaginatedList.js';
-import { listUsers, createUser } from '../../api/userApi.js';
+import useAuth from '../../hooks/useAuth.js';
+import { listUsers, createUser, deleteUserPermanently } from '../../api/userApi.js';
 import { ROLE_LABELS } from '../../constants/index.js';
 import { formatDate } from '../../utils/format.js';
 import { getErrorMessage } from '../../utils/errors.js';
@@ -25,8 +27,11 @@ const roleTones = { ADMIN: 'brand', STAFF: 'info', CLIENT: 'neutral' };
 
 const AdminUsers = () => {
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { items, pagination, filters, updateFilter, resetFilters, search, setSearch, setPage, isLoading, error, refetch } =
     usePaginatedList(listUsers, { initialFilters: { role: '', isActive: '' } });
@@ -42,6 +47,21 @@ const AdminUsers = () => {
       toast.error(getErrorMessage(err));
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleRemoveUser = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await deleteUserPermanently(deleteTarget._id);
+      toast.success(`${deleteTarget.name} was permanently removed`);
+      setDeleteTarget(null);
+      refetch();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -72,6 +92,24 @@ const AdminUsers = () => {
       ),
     },
     { key: 'lastLogin', header: 'Last seen', render: (row) => formatDate(row.lastLogin) },
+    {
+      key: 'actions',
+      header: '',
+      render: (row) => {
+        if (currentUser && currentUser._id === row._id) return null;
+        return (
+          <div onClick={(e) => e.stopPropagation()}>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={Trash2}
+              onClick={() => setDeleteTarget(row)}
+              aria-label={`Delete ${row.name}`}
+            />
+          </div>
+        );
+      },
+    },
   ];
 
   return (
@@ -132,6 +170,17 @@ const AdminUsers = () => {
       <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Add a person" size="lg">
         <UserForm onSubmit={create} isSubmitting={isSaving} onCancel={() => setIsCreateOpen(false)} />
       </Modal>
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleRemoveUser}
+        title={`Delete account for ${deleteTarget?.name}?`}
+        description="Are you sure you want to permanently delete this user account? Their data and access will be removed."
+        confirmLabel="Delete account"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </PageContainer>
   );
 };

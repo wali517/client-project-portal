@@ -25,6 +25,7 @@ const StaffProjectDetail = ({ defaultTab = 'files' }) => {
   const { id } = useParams();
   const { user } = useAuth();
   const [tab, setTab] = useState(defaultTab);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchProject = useCallback(() => getProject(id), [id]);
   const { data, isLoading, error, refetch } = useFetch(fetchProject, [id]);
@@ -69,7 +70,7 @@ const StaffProjectDetail = ({ defaultTab = 'files' }) => {
                     tabs={[
                       { value: 'files', label: 'Files', count: files.length },
                       { value: 'revisions', label: 'Revisions', count: revisions.length },
-                      { value: 'messages', label: 'Messages' },
+                      { value: 'messages', label: 'Messages', count: unreadCount || undefined },
                       { value: 'activity', label: 'Activity' },
                     ]}
                   />
@@ -90,7 +91,13 @@ const StaffProjectDetail = ({ defaultTab = 'files' }) => {
 
                     {tab === 'revisions' && <RevisionList revisions={revisions} />}
 
-                    {tab === 'messages' && <MessageThread fetchMessages={fetchMessages} sendMessage={sendMessage} />}
+                    {tab === 'messages' && (
+                      <MessageThread
+                        fetchMessages={fetchMessages}
+                        sendMessage={sendMessage}
+                        onUnreadChange={setUnreadCount}
+                      />
+                    )}
 
                     {tab === 'activity' && (
                       <DataState

@@ -61,21 +61,18 @@ const FileUploader = ({ requestId, projectId, category, onUploaded, label = 'Add
           setIsDragging(false);
           addFiles(event.dataTransfer.files);
         }}
+        onClick={() => inputRef.current?.click()}
         className={cn(
-          'rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors',
+          'cursor-pointer rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors hover:border-brand-300 hover:bg-brand-50/30',
           isDragging ? 'border-brand-400 bg-brand-50' : 'border-ink-200 bg-ink-50/50'
         )}
       >
         <UploadCloud className="mx-auto h-6 w-6 text-ink-400" aria-hidden="true" />
         <p className="mt-2 text-sm text-ink-600">
           <span className="hidden sm:inline">Drop files here, or </span>
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="font-medium text-brand-600 underline-offset-2 hover:underline"
-          >
+          <span className="font-medium text-brand-600 underline-offset-2 hover:underline">
             choose files
-          </button>
+          </span>
         </p>
         <p className="mt-1 text-xs text-ink-500">PDF, images, Office documents and archives up to {MAX_SIZE_MB}MB</p>
         <input

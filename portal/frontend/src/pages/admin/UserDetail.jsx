@@ -118,9 +118,6 @@ const AdminUserDetail = () => {
                   >
                     {person.isActive ? 'Deactivate' : 'Reactivate'}
                   </Button>
-                  <Button variant="danger" icon={Trash2} onClick={() => setIsDeleteOpen(true)}>
-                    Delete
-                  </Button>
                 </>
               )}
             </>

@@ -34,6 +34,7 @@ const ClientRequestDetail = () => {
   const [tab, setTab] = useState('details');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchRequest = useCallback(() => getRequest(id), [id]);
   const { data, isLoading, error, refetch } = useFetch(fetchRequest, [id]);
@@ -93,7 +94,7 @@ const ClientRequestDetail = () => {
                 onChange={setTab}
                 tabs={[
                   { value: 'details', label: 'Attachments', count: files.length },
-                  { value: 'messages', label: 'Messages' },
+                  { value: 'messages', label: 'Messages', count: unreadCount || undefined },
                   { value: 'activity', label: 'Activity' },
                 ]}
               />
@@ -105,7 +106,13 @@ const ClientRequestDetail = () => {
                   </div>
                 )}
 
-                {tab === 'messages' && <MessageThread fetchMessages={fetchMessages} sendMessage={sendMessage} />}
+                {tab === 'messages' && (
+                  <MessageThread
+                    fetchMessages={fetchMessages}
+                    sendMessage={sendMessage}
+                    onUnreadChange={setUnreadCount}
+                  />
+                )}
 
                 {tab === 'activity' && (
                   <DataState

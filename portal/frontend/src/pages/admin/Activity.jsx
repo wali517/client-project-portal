@@ -24,17 +24,31 @@ const AdminActivity = () => {
   const { items, pagination, filters, updateFilter, resetFilters, setPage, isLoading, error, refetch } =
     usePaginatedList(listActivity, { initialFilters: { action: '' }, limit: 25 });
 
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
   const [isClearing, setIsClearing] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
-  const handleClear = async () => {
+  const isAllSelected = items.length > 0 && selectedIds.length === items.length;
+
+  const handleToggle = (id) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
+  };
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(items.map((item) => item._id));
+    }
+  };
+
+  const handleDelete = async () => {
     setIsClearing(true);
     try {
-      const targetIds = selectedId ? [selectedId] : 'all';
+      const targetIds = selectedIds.length > 0 ? selectedIds : 'all';
       const res = await deleteActivityLogs(targetIds);
-      toast.success(res.message || 'Activity cleared successfully');
-      setSelectedId(null);
+      toast.success(res.message || 'Activity deleted successfully');
+      setSelectedIds([]);
       setIsConfirmOpen(false);
       refetch();
     } catch (err) {
@@ -53,7 +67,7 @@ const AdminActivity = () => {
 
       <Card>
         <div className="flex flex-col gap-3 border-b border-ink-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div className="flex flex-1 items-center gap-3">
+          <div className="flex flex-1 flex-wrap items-center gap-3">
             <Select
               value={filters.action}
               onChange={(event) => updateFilter('action', event.target.value)}
@@ -70,6 +84,24 @@ const AdminActivity = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {items.length > 0 && (
+              <Button
+                type="button"
+                variant={isAllSelected ? 'secondary' : 'ghost'}
+                size="md"
+                onClick={handleSelectAll}
+                className="inline-flex items-center gap-2"
+              >
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  onChange={() => {}}
+                  className="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500 cursor-pointer pointer-events-none"
+                />
+                <span>Select All</span>
+              </Button>
+            )}
+
             <Button
               variant="danger"
               icon={Trash2}
@@ -77,7 +109,7 @@ const AdminActivity = () => {
               disabled={!items.length || isClearing}
               isLoading={isClearing}
             >
-              {selectedId ? 'Clear chosen item' : 'Clear activity list'}
+              {selectedIds.length > 0 ? `Delete selected (${selectedIds.length})` : 'Delete all activity'}
             </Button>
           </div>
         </div>
@@ -96,8 +128,8 @@ const AdminActivity = () => {
             <ActivityTimeline
               entries={items}
               selectable={true}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
+              selectedIds={selectedIds}
+              onToggle={handleToggle}
             />
           </DataState>
         </CardBody>
@@ -108,14 +140,14 @@ const AdminActivity = () => {
       <ConfirmDialog
         isOpen={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}
-        onConfirm={handleClear}
-        title={selectedId ? 'Clear selected activity item?' : 'Clear activity list?'}
+        onConfirm={handleDelete}
+        title={selectedIds.length > 0 ? `Delete ${selectedIds.length} selected activity item(s)?` : 'Delete all activity logs?'}
         description={
-          selectedId
-            ? 'Are you sure you want to delete the chosen activity log entry? It will not show up again.'
-            : 'Are you sure you want to clear the entire activity list? This action cannot be undone.'
+          selectedIds.length > 0
+            ? 'Are you sure you want to delete the selected activity log entries? This action cannot be undone.'
+            : 'Are you sure you want to delete the entire activity log? This action cannot be undone.'
         }
-        confirmLabel={selectedId ? 'Clear item' : 'Clear all'}
+        confirmLabel={selectedIds.length > 0 ? 'Delete selected' : 'Delete all'}
         isLoading={isClearing}
       />
     </PageContainer>

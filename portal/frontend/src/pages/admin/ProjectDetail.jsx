@@ -34,6 +34,7 @@ const AdminProjectDetail = () => {
   const [tab, setTab] = useState('overview');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchProject = useCallback(() => getProject(id), [id]);
   const { data, isLoading, error, refetch } = useFetch(fetchProject, [id]);
@@ -106,7 +107,7 @@ const AdminProjectDetail = () => {
                       { value: 'overview', label: 'Team', count: assignments.length },
                       { value: 'files', label: 'Files', count: files.length },
                       { value: 'revisions', label: 'Revisions', count: revisions.length },
-                      { value: 'messages', label: 'Messages' },
+                      { value: 'messages', label: 'Messages', count: unreadCount || undefined },
                       { value: 'activity', label: 'Activity' },
                     ]}
                   />
@@ -128,7 +129,13 @@ const AdminProjectDetail = () => {
 
                     {tab === 'revisions' && <RevisionList revisions={revisions} />}
 
-                    {tab === 'messages' && <MessageThread fetchMessages={fetchMessages} sendMessage={sendMessage} />}
+                    {tab === 'messages' && (
+                      <MessageThread
+                        fetchMessages={fetchMessages}
+                        sendMessage={sendMessage}
+                        onUnreadChange={setUnreadCount}
+                      />
+                    )}
 
                     {tab === 'activity' && (
                       <DataState

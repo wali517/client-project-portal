@@ -15,9 +15,12 @@ export const canAssignStaff = isAdmin;
 
 export const canSubmitWork = (user, project) =>
   isStaff(user) &&
-  [PROJECT_STATUS.IN_PROGRESS, PROJECT_STATUS.REVISION_REQUIRED, PROJECT_STATUS.WAITING_FOR_CLIENT].includes(
-    project?.status
-  );
+  [
+    PROJECT_STATUS.NOT_STARTED,
+    PROJECT_STATUS.ASSIGNED,
+    PROJECT_STATUS.IN_PROGRESS,
+    PROJECT_STATUS.REVISION_REQUIRED,
+  ].includes(project?.status);
 
 export const canAdminReview = (user, project) => isAdmin(user) && project?.status === PROJECT_STATUS.UNDER_REVIEW;
 

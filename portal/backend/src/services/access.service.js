@@ -64,6 +64,14 @@ export const loadRequestForUser = async (requestId, user, { populate = true } = 
   if (!request) throw ApiError.notFound('Request not found');
 
   if (user.role === ROLES.ADMIN) return request;
-  if (user.role === ROLES.CLIENT && sameId(request.client?._id || request.client, user._id)) return request;
+  if (user.role === ROLES.CLIENT && sameId(request.client?._id || request.client, user._id)) {
+    request.adminNotes = undefined;
+    return request;
+  }
+  if (user.role === ROLES.STAFF) {
+    request.adminNotes = undefined;
+    request.rejectionReason = undefined;
+    return request;
+  }
   throw ApiError.forbidden('You do not have access to this request');
 };

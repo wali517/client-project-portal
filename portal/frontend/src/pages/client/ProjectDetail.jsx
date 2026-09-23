@@ -24,6 +24,7 @@ const ClientProjectDetail = () => {
   const { id } = useParams();
   const { user } = useAuth();
   const [tab, setTab] = useState('files');
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchProject = useCallback(() => getProject(id), [id]);
   const { data, isLoading, error, refetch } = useFetch(fetchProject, [id]);
@@ -79,7 +80,7 @@ const ClientProjectDetail = () => {
                       { value: 'files', label: 'Delivered work', count: deliverables.length },
                       { value: 'all-files', label: 'All files', count: files.length },
                       { value: 'revisions', label: 'Revisions', count: revisions.length },
-                      { value: 'messages', label: 'Messages' },
+                      { value: 'messages', label: 'Messages', count: unreadCount || undefined },
                       { value: 'activity', label: 'Activity' },
                     ]}
                   />
@@ -108,7 +109,13 @@ const ClientProjectDetail = () => {
 
                     {tab === 'revisions' && <RevisionList revisions={revisions} />}
 
-                    {tab === 'messages' && <MessageThread fetchMessages={fetchMessages} sendMessage={sendMessage} />}
+                    {tab === 'messages' && (
+                      <MessageThread
+                        fetchMessages={fetchMessages}
+                        sendMessage={sendMessage}
+                        onUnreadChange={setUnreadCount}
+                      />
+                    )}
 
                     {tab === 'activity' && (
                       <DataState

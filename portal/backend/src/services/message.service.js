@@ -2,13 +2,33 @@ import Message from '../models/Message.js';
 import { logActivity } from './activity.service.js';
 import { loadProjectForUser, loadRequestForUser } from './access.service.js';
 import { parsePagination, buildPaginationMeta } from '../utils/pagination.js';
-import { ACTIVITY_ACTIONS } from '../constants/index.js';
+import { ACTIVITY_ACTIONS, ROLES } from '../constants/index.js';
+
+const buildMessageFilter = (baseFilter, query, user) => {
+  const filter = { ...baseFilter };
+  if (user.role === ROLES.CLIENT) {
+    filter.$or = [{ channel: 'CLIENT' }, { channel: { $exists: false } }];
+  } else if (user.role === ROLES.STAFF) {
+    filter.$or = [{ channel: 'STAFF' }];
+  } else {
+    // Admin channel selector (default CLIENT)
+    const targetChannel = query.channel || 'CLIENT';
+    filter.$or = [{ channel: targetChannel }, ...(targetChannel === 'CLIENT' ? [{ channel: { $exists: false } }] : [])];
+  }
+  return filter;
+};
+
+const getChannelForSender = (user, payloadChannel) => {
+  if (user.role === ROLES.CLIENT) return 'CLIENT';
+  if (user.role === ROLES.STAFF) return 'STAFF';
+  return payloadChannel || 'CLIENT';
+};
 
 export const listProjectMessages = async (projectId, query, user) => {
   const project = await loadProjectForUser(projectId, user, { populate: false });
   const { page, limit, skip } = parsePagination({ ...query, limit: query.limit || 50 });
 
-  const filter = { project: project._id };
+  const filter = buildMessageFilter({ project: project._id }, query, user);
   const [items, total] = await Promise.all([
     Message.find(filter)
       .populate('sender', 'name email role avatar')
@@ -21,19 +41,21 @@ export const listProjectMessages = async (projectId, query, user) => {
 
   // Mark everything the caller can see as read for them.
   await Message.updateMany(
-    { project: project._id, 'readBy.user': { $ne: user._id }, sender: { $ne: user._id } },
+    { ...filter, 'readBy.user': { $ne: user._id }, sender: { $ne: user._id } },
     { $push: { readBy: { user: user._id, readAt: new Date() } } }
   );
 
   return { items: items.reverse(), pagination: buildPaginationMeta({ page, limit, total }) };
 };
 
-export const sendProjectMessage = async (projectId, { message, attachments = [] }, user) => {
+export const sendProjectMessage = async (projectId, { message, attachments = [], channel }, user) => {
   const project = await loadProjectForUser(projectId, user, { populate: false });
+  const messageChannel = getChannelForSender(user, channel);
 
   const doc = await Message.create({
     sender: user._id,
     project: project._id,
+    channel: messageChannel,
     message,
     attachments,
     readBy: [{ user: user._id, readAt: new Date() }],
@@ -44,7 +66,7 @@ export const sendProjectMessage = async (projectId, { message, attachments = [] 
     role: user.role,
     project: project._id,
     action: ACTIVITY_ACTIONS.MESSAGE_SENT,
-    newValue: { preview: message.slice(0, 120) },
+    newValue: { preview: message.slice(0, 120), channel: messageChannel },
   });
 
   return doc.populate('sender', 'name email role avatar');
@@ -54,7 +76,7 @@ export const listRequestMessages = async (requestId, query, user) => {
   const request = await loadRequestForUser(requestId, user, { populate: false });
   const { page, limit, skip } = parsePagination({ ...query, limit: query.limit || 50 });
 
-  const filter = { request: request._id };
+  const filter = buildMessageFilter({ request: request._id }, query, user);
   const [items, total] = await Promise.all([
     Message.find(filter)
       .populate('sender', 'name email role avatar')
@@ -66,19 +88,21 @@ export const listRequestMessages = async (requestId, query, user) => {
   ]);
 
   await Message.updateMany(
-    { request: request._id, 'readBy.user': { $ne: user._id }, sender: { $ne: user._id } },
+    { ...filter, 'readBy.user': { $ne: user._id }, sender: { $ne: user._id } },
     { $push: { readBy: { user: user._id, readAt: new Date() } } }
   );
 
   return { items: items.reverse(), pagination: buildPaginationMeta({ page, limit, total }) };
 };
 
-export const sendRequestMessage = async (requestId, { message, attachments = [] }, user) => {
+export const sendRequestMessage = async (requestId, { message, attachments = [], channel }, user) => {
   const request = await loadRequestForUser(requestId, user, { populate: false });
+  const messageChannel = getChannelForSender(user, channel);
 
   const doc = await Message.create({
     sender: user._id,
     request: request._id,
+    channel: messageChannel,
     message,
     attachments,
     readBy: [{ user: user._id, readAt: new Date() }],
@@ -89,7 +113,7 @@ export const sendRequestMessage = async (requestId, { message, attachments = [] 
     role: user.role,
     request: request._id,
     action: ACTIVITY_ACTIONS.MESSAGE_SENT,
-    newValue: { preview: message.slice(0, 120) },
+    newValue: { preview: message.slice(0, 120), channel: messageChannel },
   });
 
   return doc.populate('sender', 'name email role avatar');

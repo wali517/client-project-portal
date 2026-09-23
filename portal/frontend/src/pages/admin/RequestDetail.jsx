@@ -21,6 +21,7 @@ const AdminRequestDetail = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [tab, setTab] = useState('details');
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchRequest = useCallback(() => getRequest(id), [id]);
   const { data, isLoading, error, refetch } = useFetch(fetchRequest, [id]);
@@ -67,7 +68,7 @@ const AdminRequestDetail = () => {
                 onChange={setTab}
                 tabs={[
                   { value: 'details', label: 'Attachments', count: files.length },
-                  { value: 'messages', label: 'Messages' },
+                  { value: 'messages', label: 'Messages', count: unreadCount || undefined },
                   { value: 'activity', label: 'Activity' },
                 ]}
               />
@@ -83,7 +84,13 @@ const AdminRequestDetail = () => {
                   </div>
                 )}
 
-                {tab === 'messages' && <MessageThread fetchMessages={fetchMessages} sendMessage={sendMessage} />}
+                {tab === 'messages' && (
+                  <MessageThread
+                    fetchMessages={fetchMessages}
+                    sendMessage={sendMessage}
+                    onUnreadChange={setUnreadCount}
+                  />
+                )}
 
                 {tab === 'activity' && (
                   <DataState

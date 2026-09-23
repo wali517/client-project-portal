@@ -1,19 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CheckCircle2, XCircle, Eye, StickyNote, FolderPlus, Trash2 } from 'lucide-react';
+import { CheckCircle2, XCircle, Eye, StickyNote, FolderPlus } from 'lucide-react';
 import Button from '../ui/Button.jsx';
 import Modal from '../ui/Modal.jsx';
 import Textarea from '../ui/Textarea.jsx';
 import Input from '../ui/Input.jsx';
 import Select from '../ui/Select.jsx';
 import ConfirmDialog from '../ui/ConfirmDialog.jsx';
-import DeleteConfirmDialog from '../ui/DeleteConfirmDialog.jsx';
 import {
   addRequestNote,
   approveRequest,
   convertRequest,
-  deleteRequest,
   rejectRequest,
   reviewRequest,
 } from '../../api/requestApi.js';
@@ -23,12 +21,11 @@ import { toDateInput } from '../../utils/format.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
 /** Admin-only review workflow for a single request. */
-const RequestActions = ({ request, onChanged, onDeleted }) => {
+const RequestActions = ({ request, onChanged }) => {
   const navigate = useNavigate();
   const [dialog, setDialog] = useState(null);
   const [text, setText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [staffOptions, setStaffOptions] = useState([]);
   const [convertValues, setConvertValues] = useState({ deadline: '', budget: '', staffId: '' });
 
@@ -101,16 +98,10 @@ const RequestActions = ({ request, onChanged, onDeleted }) => {
     );
   }
 
-  actions.push(
-    <Button key="note" variant="ghost" icon={StickyNote} onClick={() => setDialog('note')}>
-      Add note
-    </Button>
-  );
-
-  if (status !== REQUEST_STATUS.CONVERTED_TO_PROJECT) {
+  if (status !== REQUEST_STATUS.REJECTED) {
     actions.push(
-      <Button key="delete" variant="danger" icon={Trash2} onClick={() => setDialog('delete')}>
-        Delete
+      <Button key="note" variant="ghost" icon={StickyNote} onClick={() => setDialog('note')}>
+        Add note
       </Button>
     );
   }
@@ -264,28 +255,6 @@ const RequestActions = ({ request, onChanged, onDeleted }) => {
           </p>
         </div>
       </Modal>
-
-      <DeleteConfirmDialog
-        isOpen={dialog === 'delete'}
-        onClose={close}
-        isLoading={isDeleting}
-        title={`Permanently delete ${request.requestNumber}?`}
-        description="This removes the request, its attachments and its messages completely — it disappears from every list and cannot be recovered."
-        confirmWith={request.requestNumber}
-        onConfirm={async () => {
-          setIsDeleting(true);
-          try {
-            await deleteRequest(request._id);
-            toast.success(`${request.requestNumber} was permanently deleted`);
-            close();
-            onDeleted?.();
-          } catch (error) {
-            toast.error(getErrorMessage(error));
-          } finally {
-            setIsDeleting(false);
-          }
-        }}
-      />
     </>
   );
 };

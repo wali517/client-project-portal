@@ -25,16 +25,20 @@ const ActivityTimeline = ({
   emptyDescription = 'Actions on this record will show up here.',
   selectable = false,
   selectedId = null,
+  selectedIds = [],
   onSelect = () => {},
+  onToggle = () => {},
 }) => {
   if (!entries.length) {
     return <EmptyState icon={History} title="No activity yet" description={emptyDescription} />;
   }
 
+  const activeSelectedIds = selectedIds.length ? selectedIds : selectedId ? [selectedId] : [];
+
   return (
     <ol className="relative space-y-5 pl-2">
       {entries.map((entry, index) => {
-        const isSelected = selectedId === entry._id;
+        const isSelected = activeSelectedIds.includes(entry._id);
         return (
           <li
             key={entry._id || index}
@@ -45,15 +49,14 @@ const ActivityTimeline = ({
             {selectable && (
               <div className="pt-1.5">
                 <input
-                  type="radio"
-                  name="selectedActivity"
-                  id={`activity-radio-${entry._id}`}
+                  type="checkbox"
+                  id={`activity-checkbox-${entry._id}`}
                   checked={isSelected}
-                  onChange={() => onSelect(entry._id === selectedId ? null : entry._id)}
-                  onClick={() => {
-                    if (isSelected) onSelect(null);
+                  onChange={() => {
+                    if (onToggle) onToggle(entry._id);
+                    if (onSelect) onSelect(entry._id);
                   }}
-                  className="h-4 w-4 border-ink-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                  className="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
                   aria-label={`Select activity ${entry._id}`}
                 />
               </div>

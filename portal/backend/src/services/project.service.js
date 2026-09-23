@@ -84,6 +84,24 @@ export const listProjects = async (query, user) => {
   return { items, pagination: buildPaginationMeta({ page, limit, total }) };
 };
 
+const buildRevisionFilter = (projectId, user) => {
+  const filter = { project: projectId };
+  if (user.role === ROLES.CLIENT) {
+    filter.$or = [
+      { requestedByRole: ROLES.CLIENT },
+      { targetRole: ROLES.CLIENT },
+      { requestedByRole: ROLES.ADMIN, targetRole: { $exists: false } },
+    ];
+  } else if (user.role === ROLES.STAFF) {
+    filter.$or = [
+      { requestedByRole: ROLES.STAFF },
+      { targetRole: ROLES.STAFF },
+      { requestedByRole: ROLES.ADMIN, targetRole: { $exists: false } },
+    ];
+  }
+  return filter;
+};
+
 export const getProject = async (id, user) => {
   const project = await loadProjectForUser(id, user);
   const [assignments, files, revisions] = await Promise.all([
@@ -91,7 +109,7 @@ export const getProject = async (id, user) => {
       .populate('staff', 'name email avatar role')
       .populate('assignedBy', 'name role'),
     File.find({ project: project._id, isDeleted: false }).populate('uploadedBy', 'name role').sort('-createdAt'),
-    Revision.find({ project: project._id }).populate('requestedBy', 'name role').sort('-createdAt'),
+    Revision.find(buildRevisionFilter(project._id, user)).populate('requestedBy', 'name role').sort('-createdAt'),
   ]);
   return { project, assignments, files, revisions };
 };
@@ -348,8 +366,9 @@ export const submitWork = async (id, { note } = {}, user) => {
     if (!assigned) throw ApiError.forbidden('You are not assigned to this project');
   }
 
-  // Coming back from a revision, the project passes through IN_PROGRESS first.
-  if (project.status === PROJECT_STATUS.REVISION_REQUIRED) {
+  // Coming back from NOT_STARTED, ASSIGNED, or REVISION_REQUIRED, pass through IN_PROGRESS first.
+  if ([PROJECT_STATUS.NOT_STARTED, PROJECT_STATUS.ASSIGNED, PROJECT_STATUS.REVISION_REQUIRED].includes(project.status)) {
+    const prev = project.status;
     project.status = PROJECT_STATUS.IN_PROGRESS;
     await project.save();
     await logActivity({
@@ -357,7 +376,7 @@ export const submitWork = async (id, { note } = {}, user) => {
       role: user.role,
       project,
       action: ACTIVITY_ACTIONS.PROJECT_STATUS_CHANGED,
-      previousValue: { status: PROJECT_STATUS.REVISION_REQUIRED },
+      previousValue: { status: prev },
       newValue: { status: PROJECT_STATUS.IN_PROGRESS },
     });
   }
@@ -413,12 +432,12 @@ export const adminReview = async (id, { decision, reason, instructions }, user) 
   }
 
   if (!reason) throw ApiError.badRequest('A revision reason is required');
-  const revision = await createRevision(project, { reason, instructions }, user);
+  const revision = await createRevision(project, { reason, instructions, targetRole: ROLES.STAFF }, user);
   return { project: revision.project, revision: revision.revision };
 };
 
 /** Shared by admin and client revision flows. */
-export const createRevision = async (projectOrId, { reason, instructions = '' }, user) => {
+export const createRevision = async (projectOrId, { reason, instructions = '', targetRole }, user) => {
   const project =
     typeof projectOrId === 'object' && projectOrId._id
       ? projectOrId
@@ -428,10 +447,13 @@ export const createRevision = async (projectOrId, { reason, instructions = '' },
     throw ApiError.badRequest('A closed project cannot be sent back for revision');
   }
 
+  const computedTargetRole = targetRole || (user.role === ROLES.ADMIN ? ROLES.CLIENT : ROLES.ADMIN);
+
   const revision = await Revision.create({
     project: project._id,
     requestedBy: user._id,
     requestedByRole: user.role,
+    targetRole: computedTargetRole,
     reason,
     instructions,
     status: REVISION_STATUS.OPEN,
@@ -529,7 +551,7 @@ export const cancelProject = async (id, reason, user) => {
 
 export const listRevisions = async (id, user) => {
   const project = await loadProjectForUser(id, user, { populate: false });
-  return Revision.find({ project: project._id })
+  return Revision.find(buildRevisionFilter(project._id, user))
     .populate('requestedBy', 'name email role')
     .populate('resolvedBy', 'name email role')
     .sort('-createdAt');

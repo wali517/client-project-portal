@@ -86,6 +86,7 @@ describe('Request workflow', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe(REQUEST_STATUS.REJECTED);
     expect(res.body.data.rejectionReason).toContain('Budget');
+    expect(res.body.data.adminNotes).toHaveLength(0);
   });
 
   it('paginates and filters the request list', async () => {
