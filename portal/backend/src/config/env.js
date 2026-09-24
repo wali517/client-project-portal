@@ -31,10 +31,11 @@ export const env = {
   rateLimitMax: toInt(process.env.RATE_LIMIT_MAX, 300),
   authRateLimitMax: toInt(process.env.AUTH_RATE_LIMIT_MAX, 10),
   smtp: {
+    service: process.env.SMTP_SERVICE || '',
     host: process.env.SMTP_HOST || '',
     port: toInt(process.env.SMTP_PORT, 587),
     user: process.env.SMTP_USER || '',
-    password: process.env.SMTP_PASSWORD || '',
+    password: process.env.SMTP_PASSWORD || process.env.SMTP_PASS || '',
     from: process.env.SMTP_FROM || 'CPM Portal <no-reply@example.com>',
   },
   seed: {

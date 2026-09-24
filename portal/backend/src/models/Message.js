@@ -20,6 +20,8 @@ const messageSchema = new mongoose.Schema(
 
 messageSchema.index({ project: 1, createdAt: -1 });
 messageSchema.index({ request: 1, createdAt: -1 });
+messageSchema.index({ project: 1, channel: 1, createdAt: -1 });
+messageSchema.index({ request: 1, channel: 1, createdAt: -1 });
 
 const Message = mongoose.model('Message', messageSchema);
 export default Message;

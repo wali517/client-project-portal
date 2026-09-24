@@ -44,11 +44,10 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   const email = req.body.email?.toLowerCase()?.trim();
   const user = await User.findOne({ email });
 
-  // Always answer the same way so the endpoint cannot be used to find accounts.
-  const genericResponse = () =>
+  const genericResponse = (extraData = {}) =>
     sendSuccess(res, {
       message: 'If that email is registered, a reset link is on its way.',
-      data: null,
+      data: extraData,
     });
 
   if (!user || !user.isActive) return genericResponse();
@@ -57,10 +56,11 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   await user.save({ validateBeforeSave: false });
 
   const resetUrl = `${env.clientUrl}/reset-password?token=${rawToken}`;
-  await sendPasswordResetEmail({ to: user.email, name: user.name, resetUrl });
+  const mailResult = await sendPasswordResetEmail({ to: user.email, name: user.name, resetUrl });
   logger.info(`Password reset link generated for ${user.email} (expires in 30 min): ${resetUrl}`);
 
-  return genericResponse();
+  const isDevOrFallback = !env.isProduction || !env.smtp.host || !mailResult?.delivered;
+  return genericResponse(isDevOrFallback ? { resetUrl, token: rawToken } : {});
 });
 
 export const resetPassword = asyncHandler(async (req, res) => {

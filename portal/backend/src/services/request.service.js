@@ -46,7 +46,8 @@ export const listRequests = async (query, user) => {
       .populate('convertedProject', 'projectNumber title status')
       .sort(sort)
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
     Request.countDocuments(filter),
   ]);
 

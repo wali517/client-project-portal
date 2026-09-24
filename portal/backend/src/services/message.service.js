@@ -39,7 +39,8 @@ export const listProjectMessages = async (projectId, query, user) => {
       .populate('attachments', 'originalName mimeType size')
       .sort('-createdAt')
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
     Message.countDocuments(filter),
   ]);
 
@@ -96,7 +97,8 @@ export const listRequestMessages = async (requestId, query, user) => {
       .populate('attachments', 'originalName mimeType size')
       .sort('-createdAt')
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
     Message.countDocuments(filter),
   ]);
 

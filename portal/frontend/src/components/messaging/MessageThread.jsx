@@ -3,7 +3,6 @@ import toast from 'react-hot-toast';
 import MessageList from './MessageList.jsx';
 import MessageInput from './MessageInput.jsx';
 import DataState from '../ui/DataState.jsx';
-import Tabs from '../ui/Tabs.jsx';
 import useFetch from '../../hooks/useFetch.js';
 import useAuth from '../../hooks/useAuth.js';
 import { ROLES } from '../../constants/index.js';

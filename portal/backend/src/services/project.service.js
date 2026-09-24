@@ -77,7 +77,8 @@ export const listProjects = async (query, user) => {
       .populate({ path: 'assignments', match: { status: ASSIGNMENT_STATUS.ACTIVE }, populate: { path: 'staff', select: 'name email avatar' } })
       .sort(sort)
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
     Project.countDocuments(filter),
   ]);
 

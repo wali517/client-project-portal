@@ -6,16 +6,17 @@ let transporter = null;
 
 const getTransporter = async () => {
   if (transporter) return transporter;
-  if (env.smtp.host) {
-    transporter = nodemailer.createTransport({
-      host: env.smtp.host,
-      port: env.smtp.port,
-      secure: env.smtp.port === 465,
-      auth: env.smtp.user ? { user: env.smtp.user, pass: env.smtp.password } : undefined,
-      tls: {
-        rejectUnauthorized: false,
-      },
-    });
+  if (env.smtp.service || env.smtp.host) {
+    const transportConfig = env.smtp.service
+      ? { service: env.smtp.service, auth: { user: env.smtp.user, pass: env.smtp.password } }
+      : {
+          host: env.smtp.host,
+          port: env.smtp.port,
+          secure: env.smtp.port === 465,
+          auth: env.smtp.user ? { user: env.smtp.user, pass: env.smtp.password } : undefined,
+          tls: { rejectUnauthorized: false },
+        };
+    transporter = nodemailer.createTransport(transportConfig);
     return transporter;
   }
   try {
