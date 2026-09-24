@@ -125,8 +125,17 @@ export const changeRequestStatus = async (id, status, user, extra = {}) => {
   request.status = status;
   request.reviewedBy = user._id;
   request.reviewedAt = new Date();
-  if (extra.rejectionReason) request.rejectionReason = extra.rejectionReason;
-  if (extra.note) request.adminNotes.push({ author: user._id, note: extra.note });
+  if (extra.rejectionReason) {
+    request.rejectionReason = extra.rejectionReason;
+  }
+  if (extra.note) {
+    if (status === REQUEST_STATUS.APPROVED) {
+      request.approvalNote = extra.note;
+      request.adminNotes.push({ author: user._id, note: extra.note, type: 'APPROVE' });
+    } else {
+      request.adminNotes.push({ author: user._id, note: extra.note, type: 'NOTE' });
+    }
+  }
   await request.save();
 
   const actionByStatus = {
@@ -149,7 +158,7 @@ export const changeRequestStatus = async (id, status, user, extra = {}) => {
 
 export const addAdminNote = async (id, note, user) => {
   const request = await loadRequestForUser(id, user, { populate: false });
-  request.adminNotes.push({ author: user._id, note });
+  request.adminNotes.push({ author: user._id, note, type: 'NOTE' });
   await request.save();
 
   await logActivity({

@@ -1,3 +1,4 @@
+import path from 'node:path';
 import express from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -81,6 +82,11 @@ if (!env.isTest) {
  * API rate limiting
  */
 app.use('/api', globalLimiter);
+
+/**
+ * Static files
+ */
+app.use('/uploads', express.static(path.resolve(env.uploadDir || 'uploads')));
 
 /**
  * API routes

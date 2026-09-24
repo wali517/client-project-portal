@@ -18,11 +18,13 @@ const requestSchema = new mongoose.Schema(
       {
         author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
         note: { type: String, required: true, trim: true, maxlength: 2000 },
+        type: { type: String, enum: ['NOTE', 'APPROVE', 'REJECT'], default: 'NOTE' },
         createdAt: { type: Date, default: Date.now },
       },
     ],
     reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     reviewedAt: { type: Date },
+    approvalNote: { type: String, trim: true, maxlength: 2000 },
     rejectionReason: { type: String, trim: true, maxlength: 2000 },
     convertedProject: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
   },

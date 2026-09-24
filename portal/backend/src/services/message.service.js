@@ -7,13 +7,17 @@ import { ACTIVITY_ACTIONS, ROLES } from '../constants/index.js';
 const buildMessageFilter = (baseFilter, query, user) => {
   const filter = { ...baseFilter };
   if (user.role === ROLES.CLIENT) {
-    filter.$or = [{ channel: 'CLIENT' }, { channel: { $exists: false } }];
+    filter.$or = [{ channel: 'CLIENT' }, { channel: { $exists: false } }, { channel: null }];
   } else if (user.role === ROLES.STAFF) {
-    filter.$or = [{ channel: 'STAFF' }];
+    filter.channel = 'STAFF';
   } else {
     // Admin channel selector (default CLIENT)
-    const targetChannel = query.channel || 'CLIENT';
-    filter.$or = [{ channel: targetChannel }, ...(targetChannel === 'CLIENT' ? [{ channel: { $exists: false } }] : [])];
+    const targetChannel = query.channel === 'STAFF' ? 'STAFF' : 'CLIENT';
+    if (targetChannel === 'STAFF') {
+      filter.channel = 'STAFF';
+    } else {
+      filter.$or = [{ channel: 'CLIENT' }, { channel: { $exists: false } }, { channel: null }];
+    }
   }
   return filter;
 };
@@ -21,7 +25,7 @@ const buildMessageFilter = (baseFilter, query, user) => {
 const getChannelForSender = (user, payloadChannel) => {
   if (user.role === ROLES.CLIENT) return 'CLIENT';
   if (user.role === ROLES.STAFF) return 'STAFF';
-  return payloadChannel || 'CLIENT';
+  return payloadChannel === 'STAFF' ? 'STAFF' : 'CLIENT';
 };
 
 export const listProjectMessages = async (projectId, query, user) => {
@@ -39,13 +43,22 @@ export const listProjectMessages = async (projectId, query, user) => {
     Message.countDocuments(filter),
   ]);
 
+  const targetChannel = user.role === ROLES.STAFF ? 'STAFF' : user.role === ROLES.CLIENT ? 'CLIENT' : query.channel === 'STAFF' ? 'STAFF' : 'CLIENT';
+  const cleanItems = items.filter((item) => {
+    const senderRole = item.sender?.role;
+    if (targetChannel === 'STAFF') {
+      return item.channel === 'STAFF' && senderRole !== ROLES.CLIENT;
+    }
+    return item.channel !== 'STAFF' && senderRole !== ROLES.STAFF;
+  });
+
   // Mark everything the caller can see as read for them.
   await Message.updateMany(
     { ...filter, 'readBy.user': { $ne: user._id }, sender: { $ne: user._id } },
     { $push: { readBy: { user: user._id, readAt: new Date() } } }
   );
 
-  return { items: items.reverse(), pagination: buildPaginationMeta({ page, limit, total }) };
+  return { items: cleanItems.reverse(), pagination: buildPaginationMeta({ page, limit, total }) };
 };
 
 export const sendProjectMessage = async (projectId, { message, attachments = [], channel }, user) => {
@@ -87,12 +100,21 @@ export const listRequestMessages = async (requestId, query, user) => {
     Message.countDocuments(filter),
   ]);
 
+  const targetChannel = user.role === ROLES.STAFF ? 'STAFF' : user.role === ROLES.CLIENT ? 'CLIENT' : query.channel === 'STAFF' ? 'STAFF' : 'CLIENT';
+  const cleanItems = items.filter((item) => {
+    const senderRole = item.sender?.role;
+    if (targetChannel === 'STAFF') {
+      return item.channel === 'STAFF' && senderRole !== ROLES.CLIENT;
+    }
+    return item.channel !== 'STAFF' && senderRole !== ROLES.STAFF;
+  });
+
   await Message.updateMany(
     { ...filter, 'readBy.user': { $ne: user._id }, sender: { $ne: user._id } },
     { $push: { readBy: { user: user._id, readAt: new Date() } } }
   );
 
-  return { items: items.reverse(), pagination: buildPaginationMeta({ page, limit, total }) };
+  return { items: cleanItems.reverse(), pagination: buildPaginationMeta({ page, limit, total }) };
 };
 
 export const sendRequestMessage = async (requestId, { message, attachments = [], channel }, user) => {

@@ -22,6 +22,32 @@ const SingleChatBox = ({ fetchMessages, sendMessage, channel, title, onUnreadCha
   const isPollingRef = useRef(false);
 
   const messages = data?.data || [];
+  const knownMsgIdsRef = useRef(null);
+
+  // Pop up toast notification when a new message arrives from another user
+  useEffect(() => {
+    if (!messages.length) return;
+    const currentIds = new Set(messages.map((m) => String(m._id || m.id)));
+    if (knownMsgIdsRef.current === null) {
+      knownMsgIdsRef.current = currentIds;
+      return;
+    }
+    messages.forEach((msg) => {
+      const msgId = String(msg._id || msg.id);
+      if (!knownMsgIdsRef.current.has(msgId)) {
+        knownMsgIdsRef.current.add(msgId);
+        const isFromOther = String(msg.sender?._id || msg.sender) !== String(user?._id);
+        if (isFromOther) {
+          const senderName = msg.sender?.name || 'User';
+          const preview = msg.message?.length > 45 ? `${msg.message.slice(0, 45)}…` : msg.message;
+          toast(`New message from ${senderName}: "${preview}"`, {
+            icon: '💬',
+            id: `new-msg-${msgId}`,
+          });
+        }
+      }
+    });
+  }, [messages, user]);
 
   // Live polling every 2.5 seconds for real-time live chat without page refresh
   useEffect(() => {
@@ -58,7 +84,13 @@ const SingleChatBox = ({ fetchMessages, sendMessage, channel, title, onUnreadCha
       setIsSending(true);
       try {
         const response = await sendMessage({ message: text, channel });
-        setData((current) => ({ ...(current || {}), data: [...(current?.data || []), response.data] }));
+        if (response?.data) {
+          const newMsg = response.data;
+          const newMsgId = String(newMsg._id || newMsg.id);
+          if (knownMsgIdsRef.current) knownMsgIdsRef.current.add(newMsgId);
+          setData((current) => ({ ...(current || {}), data: [...(current?.data || []), newMsg] }));
+        }
+        toast.success('Message sent');
         return true;
       } catch (err) {
         toast.error(getErrorMessage(err));
@@ -117,10 +149,15 @@ const MessageThread = ({ fetchMessages, sendMessage, onUnreadChange }) => {
     );
   }
 
+  const userChannel = user?.role === ROLES.STAFF ? 'STAFF' : 'CLIENT';
+  const chatTitle = user?.role === ROLES.STAFF ? 'Staff Chat Box' : 'Client Chat Box';
+
   return (
     <SingleChatBox
       fetchMessages={fetchMessages}
       sendMessage={sendMessage}
+      channel={userChannel}
+      title={chatTitle}
       onUnreadChange={onUnreadChange}
     />
   );
