@@ -46,7 +46,7 @@ const ClientRequestDetail = () => {
     { enabled: tab === 'activity' }
   );
 
-  const fetchMessages = useCallback(() => getRequestMessages(id), [id]);
+  const fetchMessages = useCallback((params) => getRequestMessages(id, params), [id]);
   const sendMessage = useCallback((payload) => sendRequestMessage(id, payload), [id]);
 
   const request = data?.data?.request;

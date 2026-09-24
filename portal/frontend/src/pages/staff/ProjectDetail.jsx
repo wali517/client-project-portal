@@ -37,7 +37,7 @@ const StaffProjectDetail = ({ defaultTab = 'files' }) => {
     { enabled: tab === 'activity' }
   );
 
-  const fetchMessages = useCallback(() => listProjectMessages(id), [id]);
+  const fetchMessages = useCallback((params) => listProjectMessages(id, params), [id]);
   const sendMessage = useCallback((payload) => sendProjectMessage(id, payload), [id]);
 
   const project = data?.data?.project;

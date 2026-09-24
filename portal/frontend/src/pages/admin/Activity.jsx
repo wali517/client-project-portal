@@ -25,6 +25,7 @@ const AdminActivity = () => {
     usePaginatedList(listActivity, { initialFilters: { action: '' }, limit: 25 });
 
   const [selectedIds, setSelectedIds] = useState([]);
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
@@ -42,6 +43,11 @@ const AdminActivity = () => {
     }
   };
 
+  const cancelDeleteMode = () => {
+    setIsDeleteMode(false);
+    setSelectedIds([]);
+  };
+
   const handleDelete = async () => {
     setIsClearing(true);
     try {
@@ -49,6 +55,7 @@ const AdminActivity = () => {
       const res = await deleteActivityLogs(targetIds);
       toast.success(res.message || 'Activity deleted successfully');
       setSelectedIds([]);
+      setIsDeleteMode(false);
       setIsConfirmOpen(false);
       refetch();
     } catch (err) {
@@ -84,32 +91,47 @@ const AdminActivity = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            {items.length > 0 && (
-              <Button
-                type="button"
-                variant={isAllSelected ? 'secondary' : 'ghost'}
-                size="md"
-                onClick={handleSelectAll}
-                className="inline-flex items-center gap-2"
-              >
-                <input
-                  type="checkbox"
-                  checked={isAllSelected}
-                  onChange={() => {}}
-                  className="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500 cursor-pointer pointer-events-none"
-                />
-                <span>Select All</span>
-              </Button>
+            {isDeleteMode && items.length > 0 && (
+              <>
+                <Button
+                  type="button"
+                  variant={isAllSelected ? 'secondary' : 'ghost'}
+                  size="md"
+                  onClick={handleSelectAll}
+                  className="inline-flex items-center gap-2"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={() => {}}
+                    className="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500 cursor-pointer pointer-events-none"
+                  />
+                  <span>Select All</span>
+                </Button>
+                <Button type="button" variant="secondary" size="md" onClick={cancelDeleteMode}>
+                  Cancel
+                </Button>
+              </>
             )}
 
             <Button
               variant="danger"
               icon={Trash2}
-              onClick={() => setIsConfirmOpen(true)}
+              onClick={() => {
+                if (!isDeleteMode) {
+                  setIsDeleteMode(true);
+                } else {
+                  setIsConfirmOpen(true);
+                }
+              }}
               disabled={!items.length || isClearing}
               isLoading={isClearing}
             >
-              {selectedIds.length > 0 ? `Delete selected (${selectedIds.length})` : 'Delete all activity'}
+              {!isDeleteMode
+                ? 'Delete Activity'
+                : selectedIds.length > 0
+                ? `Confirm Delete (${selectedIds.length})`
+                : 'Confirm Delete All'}
             </Button>
           </div>
         </div>
@@ -127,7 +149,7 @@ const AdminActivity = () => {
           >
             <ActivityTimeline
               entries={items}
-              selectable={true}
+              selectable={isDeleteMode}
               selectedIds={selectedIds}
               onToggle={handleToggle}
             />

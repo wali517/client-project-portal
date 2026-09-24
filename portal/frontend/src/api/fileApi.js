@@ -23,8 +23,10 @@ export const deleteFile = (id) => api.delete(`/files/${id}`).then((res) => res.d
 
 /** Download through the API so permissions are checked server side. */
 export const downloadFile = async (file) => {
+  const fileId = file?._id || file?.id || (typeof file === 'string' ? file : null);
+  if (!fileId) throw new Error('Invalid file ID');
   try {
-    const response = await api.get(`/files/${file._id}/download`, { responseType: 'blob' });
+    const response = await api.get(`/files/${fileId}/download`, { responseType: 'blob' });
     if (response.data?.type === 'application/json') {
       const text = await response.data.text();
       const errorJson = JSON.parse(text);
@@ -33,11 +35,11 @@ export const downloadFile = async (file) => {
     const url = window.URL.createObjectURL(response.data);
     const link = document.createElement('a');
     link.href = url;
-    link.download = file.originalName || 'download';
+    link.download = file?.originalName || 'download';
     document.body.appendChild(link);
     link.click();
     link.remove();
-    setTimeout(() => window.URL.revokeObjectURL(url), 2000);
+    setTimeout(() => window.URL.revokeObjectURL(url), 5000);
   } catch (err) {
     if (err.response?.data instanceof Blob) {
       try {
@@ -52,19 +54,23 @@ export const downloadFile = async (file) => {
   }
 };
 
-export const buildDownloadUrl = (fileId) => {
+export const buildDownloadUrl = (file) => {
+  const fileId = file?._id || file?.id || file;
   const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
   return `${base}/files/${fileId}/download?token=${getStoredToken() || ''}`;
 };
 
-export const buildInlineUrl = (fileId) => {
+export const buildInlineUrl = (file) => {
+  const fileId = file?._id || file?.id || file;
   const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
   return `${base}/files/${fileId}/download?token=${getStoredToken() || ''}&inline=true`;
 };
 
 export const getInlineBlobUrl = async (file) => {
+  const fileId = file?._id || file?.id || (typeof file === 'string' ? file : null);
+  if (!fileId) throw new Error('Invalid file ID');
   try {
-    const response = await api.get(`/files/${file._id}/download?inline=true`, { responseType: 'blob' });
+    const response = await api.get(`/files/${fileId}/download?inline=true`, { responseType: 'blob' });
     if (response.data?.type === 'application/json') {
       const text = await response.data.text();
       const errorJson = JSON.parse(text);

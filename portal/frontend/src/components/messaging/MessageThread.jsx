@@ -9,19 +9,13 @@ import useAuth from '../../hooks/useAuth.js';
 import { ROLES } from '../../constants/index.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
-/**
- * Works for both project and request conversations: the caller passes the
- * matching list/send functions from the API layer.
- */
-const MessageThread = ({ fetchMessages, sendMessage, onUnreadChange }) => {
+const SingleChatBox = ({ fetchMessages, sendMessage, channel, title, onUnreadChange }) => {
   const { user } = useAuth();
-  const isAdmin = user?.role === ROLES.ADMIN;
-  const [channel, setChannel] = useState('CLIENT');
   const [isSending, setIsSending] = useState(false);
 
   const fetchChannelMessages = useCallback(
-    () => fetchMessages(isAdmin ? { channel } : {}),
-    [fetchMessages, isAdmin, channel]
+    () => fetchMessages(channel ? { channel } : {}),
+    [fetchMessages, channel]
   );
 
   const { data, isLoading, error, refetch, setData } = useFetch(fetchChannelMessages, [fetchChannelMessages]);
@@ -63,7 +57,7 @@ const MessageThread = ({ fetchMessages, sendMessage, onUnreadChange }) => {
     async (text) => {
       setIsSending(true);
       try {
-        const response = await sendMessage({ message: text, channel: isAdmin ? channel : undefined });
+        const response = await sendMessage({ message: text, channel });
         setData((current) => ({ ...(current || {}), data: [...(current?.data || []), response.data] }));
         return true;
       } catch (err) {
@@ -73,21 +67,17 @@ const MessageThread = ({ fetchMessages, sendMessage, onUnreadChange }) => {
         setIsSending(false);
       }
     },
-    [sendMessage, setData, isAdmin, channel]
+    [sendMessage, setData, channel]
   );
 
   return (
-    <div className="space-y-4">
-      {isAdmin && (
-        <div className="mb-2 border-b border-ink-100 pb-2">
-          <Tabs
-            active={channel}
-            onChange={setChannel}
-            tabs={[
-              { value: 'CLIENT', label: 'Client Chat' },
-              { value: 'STAFF', label: 'Staff Chat' },
-            ]}
-          />
+    <div className="flex flex-col border border-ink-200 rounded-xl bg-white p-4 shadow-sm space-y-4">
+      {title && (
+        <div className="border-b border-ink-100 pb-2 flex items-center justify-between">
+          <h3 className="font-semibold text-ink-900 text-sm">{title}</h3>
+          <span className="text-xs px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 font-medium">
+            {channel === 'CLIENT' ? 'Client <-> Admin' : 'Staff <-> Admin'}
+          </span>
         </div>
       )}
       <DataState isLoading={isLoading} error={error} onRetry={refetch} loadingLabel="Loading messages…">
@@ -95,6 +85,44 @@ const MessageThread = ({ fetchMessages, sendMessage, onUnreadChange }) => {
       </DataState>
       <MessageInput onSend={send} isSending={isSending} />
     </div>
+  );
+};
+
+/**
+ * Works for both project and request conversations: the caller passes the
+ * matching list/send functions from the API layer.
+ */
+const MessageThread = ({ fetchMessages, sendMessage, onUnreadChange }) => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === ROLES.ADMIN;
+
+  if (isAdmin) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SingleChatBox
+          fetchMessages={fetchMessages}
+          sendMessage={sendMessage}
+          channel="CLIENT"
+          title="Client Chat Box"
+          onUnreadChange={onUnreadChange}
+        />
+        <SingleChatBox
+          fetchMessages={fetchMessages}
+          sendMessage={sendMessage}
+          channel="STAFF"
+          title="Staff Chat Box"
+          onUnreadChange={onUnreadChange}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <SingleChatBox
+      fetchMessages={fetchMessages}
+      sendMessage={sendMessage}
+      onUnreadChange={onUnreadChange}
+    />
   );
 };
 

@@ -10,6 +10,7 @@ const MessageItem = ({ message, isOwn }) => (
     <Avatar name={message.sender?.name} src={message.sender?.avatar} size="sm" className="mt-1 shrink-0" />
     <div className={cn('min-w-0 max-w-[85%] sm:max-w-[70%]', isOwn && 'text-right')}>
       <p className={cn('flex flex-wrap items-center gap-2 text-xs text-ink-500', isOwn && 'justify-end')}>
+        <span className="font-medium text-ink-700">{message.sender?.name || 'Unknown'}</span>
         <Badge tone={isOwn ? 'brand' : 'neutral'}>{ROLE_LABELS[message.sender?.role] || message.sender?.role}</Badge>
         <time dateTime={message.createdAt} title={formatDateTime(message.createdAt)}>
           {relativeTime(message.createdAt)}

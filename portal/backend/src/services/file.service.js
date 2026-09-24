@@ -81,9 +81,34 @@ export const getAccessibleFile = async (fileId, user, { selectData = false } = {
   const file = await query;
   if (!file || file.isDeleted) throw ApiError.notFound('File not found');
 
-  if (file.project) await loadProjectForUser(file.project, user, { populate: false });
-  else if (file.request) await loadRequestForUser(file.request, user, { populate: false });
-  else if (user.role !== ROLES.ADMIN && !sameId(file.uploadedBy?._id, user._id)) {
+  const projectId = file.project?._id || file.project;
+  const requestId = file.request?._id || file.request;
+
+  if (projectId) {
+    try {
+      await loadProjectForUser(projectId, user, { populate: false });
+    } catch (err) {
+      if (err.statusCode === 404) {
+        if (user.role !== ROLES.ADMIN && !sameId(file.uploadedBy?._id || file.uploadedBy, user._id)) {
+          throw ApiError.forbidden('You do not have access to this file');
+        }
+      } else {
+        throw err;
+      }
+    }
+  } else if (requestId) {
+    try {
+      await loadRequestForUser(requestId, user, { populate: false });
+    } catch (err) {
+      if (err.statusCode === 404) {
+        if (user.role !== ROLES.ADMIN && !sameId(file.uploadedBy?._id || file.uploadedBy, user._id)) {
+          throw ApiError.forbidden('You do not have access to this file');
+        }
+      } else {
+        throw err;
+      }
+    }
+  } else if (user.role !== ROLES.ADMIN && !sameId(file.uploadedBy?._id || file.uploadedBy, user._id)) {
     throw ApiError.forbidden('You do not have access to this file');
   }
 
@@ -97,8 +122,10 @@ export const getFileStreamPath = async (fileId, user) => {
   }
   try {
     const filePath = await storage.getStream(file.storageKey);
+    await fs.access(filePath);
     return { file, filePath };
   } catch {
+    const rawFile = file.toObject ? file.toObject() : file;
     if (file.mimeType?.startsWith('image/')) {
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
         <rect width="600" height="400" fill="#f8fafc" rx="12"/>
@@ -106,13 +133,13 @@ export const getFileStreamPath = async (fileId, user) => {
         <circle cx="230" cy="150" r="25" fill="#94a3b8"/>
         <text x="300" y="320" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="bold" fill="#475569">${file.originalName}</text>
       </svg>`;
-      return { file: { ...file.toObject(), mimeType: 'image/svg+xml' }, buffer: Buffer.from(svg) };
+      return { file: { ...rawFile, mimeType: 'image/svg+xml' }, buffer: Buffer.from(svg) };
     }
     if (file.mimeType === 'application/pdf') {
       const pdf = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n0000000052 00000 n\n0000000101 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n178\n%%EOF';
-      return { file, buffer: Buffer.from(pdf) };
+      return { file: rawFile, buffer: Buffer.from(pdf) };
     }
-    return { file: { ...file.toObject(), mimeType: 'text/plain' }, buffer: Buffer.from(`File content for ${file.originalName}`) };
+    return { file: { ...rawFile, mimeType: 'text/plain' }, buffer: Buffer.from(`File content for ${file.originalName}`) };
   }
 };
 

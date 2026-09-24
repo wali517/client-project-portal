@@ -14,9 +14,11 @@ const FilePreviewModal = ({ isOpen, onClose, file }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    let createdUrl = null;
     if (!isOpen || !file) {
-      setBlobUrl(null);
+      setBlobUrl((prev) => {
+        if (prev) window.URL.revokeObjectURL(prev);
+        return null;
+      });
       setError(null);
       return;
     }
@@ -28,8 +30,10 @@ const FilePreviewModal = ({ isOpen, onClose, file }) => {
     getInlineBlobUrl(file)
       .then((url) => {
         if (active) {
-          createdUrl = url;
-          setBlobUrl(url);
+          setBlobUrl((prev) => {
+            if (prev) window.URL.revokeObjectURL(prev);
+            return url;
+          });
           setIsLoading(false);
         } else {
           window.URL.revokeObjectURL(url);
@@ -44,9 +48,6 @@ const FilePreviewModal = ({ isOpen, onClose, file }) => {
 
     return () => {
       active = false;
-      if (createdUrl) {
-        window.URL.revokeObjectURL(createdUrl);
-      }
     };
   }, [isOpen, file]);
 
