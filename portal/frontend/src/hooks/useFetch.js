@@ -1,10 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { getErrorMessage } from '../utils/errors.js';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getErrorMessage } from "../utils/errors.js";
 
-/**
- * Handles the loading / error / data lifecycle for a single API call.
- * `deps` controls when the request is repeated.
- */
 export const useFetch = (fetcher, deps = [], { enabled = true } = {}) => {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(enabled);
@@ -30,7 +26,6 @@ export const useFetch = (fetcher, deps = [], { enabled = true } = {}) => {
     } finally {
       if (mounted.current) setIsLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, ...deps]);
 
   useEffect(() => {

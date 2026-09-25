@@ -1,8 +1,14 @@
-import rateLimit from 'express-rate-limit';
-import env from '../config/env.js';
+import rateLimit from "express-rate-limit";
+import env from "../config/env.js";
 
 const handler = (_req, res) =>
-  res.status(429).json({ success: false, message: 'Too many requests. Please try again later.', errors: [] });
+  res
+    .status(429)
+    .json({
+      success: false,
+      message: "Too many requests. Please try again later.",
+      errors: [],
+    });
 
 export const globalLimiter = rateLimit({
   windowMs: env.rateLimitWindowMin * 60 * 1000,

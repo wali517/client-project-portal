@@ -19,7 +19,6 @@ import { getErrorMessage } from '../../utils/errors.js';
 
 const actionOptions = Object.keys(ACTIVITY_LABELS).map((value) => ({ value, label: humanize(value) }));
 
-/** The global audit trail. The API only serves this to admins. */
 const AdminActivity = () => {
   const { items, pagination, filters, updateFilter, resetFilters, setPage, isLoading, error, refetch } =
     usePaginatedList(listActivity, { initialFilters: { action: '' }, limit: 25 });

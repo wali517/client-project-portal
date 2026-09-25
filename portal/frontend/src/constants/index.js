@@ -66,7 +66,6 @@ export const PROJECT_STATUS_TONES = {
   CANCELLED: 'neutral',
 };
 
-/** Mirrors backend PROJECT_STATUS_BY_ROLE - the API is still the authority. */
 export const PROJECT_STATUS_BY_ROLE = {
   ADMIN: Object.values(PROJECT_STATUS),
   STAFF: [PROJECT_STATUS.IN_PROGRESS, PROJECT_STATUS.WAITING_FOR_CLIENT, PROJECT_STATUS.UNDER_REVIEW],

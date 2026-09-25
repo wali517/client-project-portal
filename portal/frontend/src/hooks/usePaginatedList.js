@@ -3,10 +3,6 @@ import { getErrorMessage } from '../utils/errors.js';
 import { PAGE_SIZE } from '../constants/index.js';
 import useDebounce from './useDebounce.js';
 
-/**
- * Server-side list state: search, filters, sorting and pagination in one place,
- * so every table page behaves the same way.
- */
 export const usePaginatedList = (fetcher, { initialFilters = {}, limit = PAGE_SIZE } = {}) => {
   const [items, setItems] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit, total: 0, totalPages: 1 });
@@ -40,7 +36,6 @@ export const usePaginatedList = (fetcher, { initialFilters = {}, limit = PAGE_SI
     } finally {
       setIsLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
 
   useEffect(() => {
@@ -56,7 +51,6 @@ export const usePaginatedList = (fetcher, { initialFilters = {}, limit = PAGE_SI
     setFilters(initialFilters);
     setSearch('');
     setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {

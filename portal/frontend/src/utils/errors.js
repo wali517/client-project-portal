@@ -1,4 +1,3 @@
-/** Turns an Axios/API error into a single readable sentence. */
 export const getErrorMessage = (error, fallback = 'Something went wrong. Please try again.') => {
   const data = error?.response?.data;
   if (!data) return error?.message || fallback;

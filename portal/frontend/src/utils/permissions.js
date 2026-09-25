@@ -1,9 +1,5 @@
 import { ROLES, PROJECT_STATUS } from '../constants/index.js';
 
-/**
- * UI-level gating only. Every rule here is also enforced by the API,
- * which stays the single source of truth.
- */
 export const isAdmin = (user) => user?.role === ROLES.ADMIN;
 export const isStaff = (user) => user?.role === ROLES.STAFF;
 export const isClient = (user) => user?.role === ROLES.CLIENT;

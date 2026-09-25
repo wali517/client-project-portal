@@ -15,9 +15,6 @@ const app = express();
 
 app.set('trust proxy', 1);
 
-/**
- * Allowed frontend origin
- */
 const allowedOrigins = [
   'http://localhost:5173',
   'https://frontend-theta-khaki-99.vercel.app',
@@ -52,16 +49,8 @@ app.use((req, res, next) => {
   next();
 });
 
-/**
- * Security
- */
 app.use(helmet());
-
-/**
- * Request body parsing
- */
 app.use(express.json({ limit: '1mb' }));
-
 app.use(
   express.urlencoded({
     extended: true,
@@ -69,38 +58,15 @@ app.use(
   })
 );
 
-/**
- * Logging
- */
 if (!env.isTest) {
   app.use(
     morgan(env.isProduction ? 'combined' : 'dev')
   );
 }
-
-/**
- * API rate limiting
- */
 app.use('/api', globalLimiter);
-
-/**
- * Static files
- */
 app.use('/uploads', express.static(path.resolve(env.uploadDir || 'uploads')));
-
-/**
- * API routes
- */
 app.use('/api', routes);
-
-/**
- * 404 handler
- */
 app.use(notFoundHandler);
-
-/**
- * Global error handler
- */
 app.use(errorHandler);
 
 export default app;

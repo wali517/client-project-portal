@@ -1,6 +1,5 @@
 import { ROLES } from '../constants/index.js';
 
-/** Builds the right detail URL for the signed-in role. */
 export const requestPath = (role, id) =>
   role === ROLES.ADMIN ? `/admin/requests/${id}` : `/client/requests/${id}`;
 

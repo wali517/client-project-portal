@@ -1,24 +1,43 @@
-import Request from '../models/Request.js';
-import File from '../models/File.js';
-import Message from '../models/Message.js';
-import ApiError from '../utils/ApiError.js';
-import escapeRegex from '../utils/escapeRegex.js';
-import storage from './storage/index.js';
-import { parsePagination, parseSort, buildPaginationMeta } from '../utils/pagination.js';
-import { logActivity } from './activity.service.js';
-import { generateRequestNumber } from './numbering.service.js';
-import { loadRequestForUser } from './access.service.js';
-import { createProjectFromRequest, assignStaff } from './project.service.js';
-import { ACTIVITY_ACTIONS, REQUEST_STATUS, REQUEST_STATUS_FLOW, ROLES } from '../constants/index.js';
+import Request from "../models/Request.js";
+import File from "../models/File.js";
+import Message from "../models/Message.js";
+import ApiError from "../utils/ApiError.js";
+import escapeRegex from "../utils/escapeRegex.js";
+import storage from "./storage/index.js";
+import {
+  parsePagination,
+  parseSort,
+  buildPaginationMeta,
+} from "../utils/pagination.js";
+import { logActivity } from "./activity.service.js";
+import { generateRequestNumber } from "./numbering.service.js";
+import { loadRequestForUser } from "./access.service.js";
+import { createProjectFromRequest, assignStaff } from "./project.service.js";
+import {
+  ACTIVITY_ACTIONS,
+  REQUEST_STATUS,
+  REQUEST_STATUS_FLOW,
+  ROLES,
+} from "../constants/index.js";
 
-const SORTABLE = ['createdAt', 'updatedAt', 'deadline', 'priority', 'status', 'requestNumber'];
+const SORTABLE = [
+  "createdAt",
+  "updatedAt",
+  "deadline",
+  "priority",
+  "status",
+  "requestNumber",
+];
 
 const buildFilter = (query, user) => {
   const filter = {};
   if (user.role === ROLES.CLIENT) filter.client = user._id;
   else if (query.client) filter.client = query.client;
 
-  if (query.status) filter.status = Array.isArray(query.status) ? { $in: query.status } : query.status;
+  if (query.status)
+    filter.status = Array.isArray(query.status)
+      ? { $in: query.status }
+      : query.status;
   if (query.priority) filter.priority = query.priority;
   if (query.serviceType) filter.serviceType = query.serviceType;
 
@@ -29,8 +48,12 @@ const buildFilter = (query, user) => {
   }
 
   if (query.search) {
-    const regex = new RegExp(escapeRegex(query.search), 'i');
-    filter.$or = [{ title: regex }, { description: regex }, { requestNumber: regex }];
+    const regex = new RegExp(escapeRegex(query.search), "i");
+    filter.$or = [
+      { title: regex },
+      { description: regex },
+      { requestNumber: regex },
+    ];
   }
   return filter;
 };
@@ -42,8 +65,8 @@ export const listRequests = async (query, user) => {
 
   const [items, total] = await Promise.all([
     Request.find(filter)
-      .populate('client', 'name email company avatar')
-      .populate('convertedProject', 'projectNumber title status')
+      .populate("client", "name email company avatar")
+      .populate("convertedProject", "projectNumber title status")
       .sort(sort)
       .skip(skip)
       .limit(limit)
@@ -57,8 +80,8 @@ export const listRequests = async (query, user) => {
 export const getRequest = async (id, user) => {
   const request = await loadRequestForUser(id, user);
   const files = await File.find({ request: request._id, isDeleted: false })
-    .populate('uploadedBy', 'name role')
-    .sort('-createdAt');
+    .populate("uploadedBy", "name role")
+    .sort("-createdAt");
   return { request, files };
 };
 
@@ -86,8 +109,11 @@ export const updateRequest = async (id, payload, user) => {
   const request = await loadRequestForUser(id, user, { populate: false });
 
   const editableByClient = [REQUEST_STATUS.NEW, REQUEST_STATUS.UNDER_REVIEW];
-  if (user.role === ROLES.CLIENT && !editableByClient.includes(request.status)) {
-    throw ApiError.badRequest('This request can no longer be edited');
+  if (
+    user.role === ROLES.CLIENT &&
+    !editableByClient.includes(request.status)
+  ) {
+    throw ApiError.badRequest("This request can no longer be edited");
   }
 
   const previous = {
@@ -106,7 +132,12 @@ export const updateRequest = async (id, payload, user) => {
     request,
     action: ACTIVITY_ACTIONS.REQUEST_UPDATED,
     previousValue: previous,
-    newValue: { title: request.title, priority: request.priority, deadline: request.deadline, budget: request.budget },
+    newValue: {
+      title: request.title,
+      priority: request.priority,
+      deadline: request.deadline,
+      budget: request.budget,
+    },
   });
 
   return request;
@@ -115,7 +146,10 @@ export const updateRequest = async (id, payload, user) => {
 const assertTransition = (from, to) => {
   const allowed = REQUEST_STATUS_FLOW[from] || [];
   if (from === to) throw ApiError.badRequest(`Request is already ${to}`);
-  if (!allowed.includes(to)) throw ApiError.badRequest(`Cannot change request status from ${from} to ${to}`);
+  if (!allowed.includes(to))
+    throw ApiError.badRequest(
+      `Cannot change request status from ${from} to ${to}`,
+    );
 };
 
 export const changeRequestStatus = async (id, status, user, extra = {}) => {
@@ -132,9 +166,17 @@ export const changeRequestStatus = async (id, status, user, extra = {}) => {
   if (extra.note) {
     if (status === REQUEST_STATUS.APPROVED) {
       request.approvalNote = extra.note;
-      request.adminNotes.push({ author: user._id, note: extra.note, type: 'APPROVE' });
+      request.adminNotes.push({
+        author: user._id,
+        note: extra.note,
+        type: "APPROVE",
+      });
     } else {
-      request.adminNotes.push({ author: user._id, note: extra.note, type: 'NOTE' });
+      request.adminNotes.push({
+        author: user._id,
+        note: extra.note,
+        type: "NOTE",
+      });
     }
   }
   await request.save();
@@ -159,7 +201,7 @@ export const changeRequestStatus = async (id, status, user, extra = {}) => {
 
 export const addAdminNote = async (id, note, user) => {
   const request = await loadRequestForUser(id, user, { populate: false });
-  request.adminNotes.push({ author: user._id, note, type: 'NOTE' });
+  request.adminNotes.push({ author: user._id, note, type: "NOTE" });
   await request.save();
 
   await logActivity({
@@ -176,9 +218,14 @@ export const addAdminNote = async (id, note, user) => {
 export const convertRequestToProject = async (id, payload, user) => {
   const request = await loadRequestForUser(id, user, { populate: false });
 
-  if (request.convertedProject) throw ApiError.conflict('This request was already converted into a project');
+  if (request.convertedProject)
+    throw ApiError.conflict(
+      "This request was already converted into a project",
+    );
   if (request.status !== REQUEST_STATUS.APPROVED) {
-    throw ApiError.badRequest('Only approved requests can be converted into a project');
+    throw ApiError.badRequest(
+      "Only approved requests can be converted into a project",
+    );
   }
 
   const project = await createProjectFromRequest(request, payload, user);
@@ -204,21 +251,23 @@ export const convertRequestToProject = async (id, payload, user) => {
   return project;
 };
 
-/**
- * Hard delete: only for requests that were never converted, so a project's
- * origin story can never be silently erased out from under it. Cascades to
- * the request's own files and messages, including their stored bytes.
- */
 export const permanentlyDeleteRequest = async (id, user) => {
   const request = await loadRequestForUser(id, user, { populate: false });
 
-  if (request.convertedProject || request.status === REQUEST_STATUS.CONVERTED_TO_PROJECT) {
+  if (
+    request.convertedProject ||
+    request.status === REQUEST_STATUS.CONVERTED_TO_PROJECT
+  ) {
     throw ApiError.conflict(
-      'This request was converted into a project and cannot be deleted on its own. Delete the project instead if you want to remove it entirely.'
+      "This request was converted into a project and cannot be deleted on its own. Delete the project instead if you want to remove it entirely.",
     );
   }
 
-  const snapshot = { requestNumber: request.requestNumber, title: request.title, status: request.status };
+  const snapshot = {
+    requestNumber: request.requestNumber,
+    title: request.title,
+    status: request.status,
+  };
 
   const files = await File.find({ request: request._id });
   await Promise.all(files.map((file) => storage.remove(file.storageKey)));

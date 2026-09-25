@@ -20,8 +20,6 @@ export const uploadFiles = ({ files, requestId, projectId, category, onProgress 
 export const listFiles = (params) => api.get('/files', { params }).then((res) => res.data);
 export const getFile = (id) => api.get(`/files/${id}`).then((res) => res.data);
 export const deleteFile = (id) => api.delete(`/files/${id}`).then((res) => res.data);
-
-/** Download through the API so permissions are checked server side. */
 export const downloadFile = async (file) => {
   const fileId = file?._id || file?.id || (typeof file === 'string' ? file : null);
   if (!fileId) throw new Error('Invalid file ID');

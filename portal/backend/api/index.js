@@ -1,5 +1,5 @@
-import app from '../src/app.js';
-import connectDB from '../src/config/db.js';
+import app from "../src/app.js";
+import connectDB from "../src/config/db.js";
 
 let dbPromise;
 
@@ -13,11 +13,11 @@ export default async function handler(req, res) {
 
     return app(req, res);
   } catch (error) {
-    console.error('MongoDB connection failed:', error);
+    console.error("MongoDB connection failed:", error);
 
     return res.status(500).json({
       success: false,
-      message: 'Database connection failed',
+      message: "Database connection failed",
       error: error.message,
     });
   }

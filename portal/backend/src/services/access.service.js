@@ -5,7 +5,6 @@ import ProjectAssignment from '../models/ProjectAssignment.js';
 import Project from '../models/Project.js';
 import Request from '../models/Request.js';
 
-/** Project ids a staff member is actively assigned to. */
 export const getAssignedProjectIds = async (staffId) => {
   const assignments = await ProjectAssignment.find({
     staff: staffId,
@@ -22,8 +21,6 @@ export const isStaffAssigned = async (projectId, staffId) => {
   });
   return Boolean(assignment);
 };
-
-/** Loads a project and enforces ownership/assignment rules for the caller. */
 export const loadProjectForUser = async (projectId, user, { populate = true } = {}) => {
   const query = Project.findById(projectId);
   if (populate) {
@@ -49,8 +46,6 @@ export const loadProjectForUser = async (projectId, user, { populate = true } = 
   }
   throw ApiError.forbidden('You do not have access to this project');
 };
-
-/** Loads a request and enforces ownership rules for the caller. */
 export const loadRequestForUser = async (requestId, user, { populate = true } = {}) => {
   const query = Request.findById(requestId);
   if (populate) {
