@@ -4,6 +4,7 @@ import useAuth from '../../hooks/useAuth.js';
 import Avatar from '../ui/Avatar.jsx';
 import Logo from './Logo.jsx';
 import ChangePasswordModal from '../auth/ChangePasswordModal.jsx';
+import NotificationDropdown from '../notifications/NotificationDropdown.jsx';
 import { ROLE_LABELS } from '../../constants/index.js';
 
 const Header = ({ onOpenMenu }) => {
@@ -28,58 +29,62 @@ const Header = ({ onOpenMenu }) => {
           </span>
         </div>
 
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setIsOpen((value) => !value)}
-            className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-ink-100"
-            aria-haspopup="menu"
-            aria-expanded={isOpen}
-          >
-            <Avatar name={user?.name} src={user?.avatar} size="sm" />
-            <span className="hidden text-left sm:block">
-              <span className="block text-sm font-medium text-ink-900">{user?.name}</span>
-              <span className="block text-xs text-ink-500">{ROLE_LABELS[user?.role]}</span>
-            </span>
-            <ChevronDown className="h-4 w-4 text-ink-500" aria-hidden="true" />
-          </button>
+        <div className="flex items-center gap-3">
+          <NotificationDropdown />
 
-          {isOpen && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} role="presentation" />
-              <div
-                role="menu"
-                className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl border border-ink-100 bg-white shadow-card"
-              >
-                <div className="border-b border-ink-100 px-4 py-3">
-                  <p className="truncate text-sm font-medium text-ink-900">{user?.name}</p>
-                  <p className="truncate text-xs text-ink-500">{user?.email}</p>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsOpen((value) => !value)}
+              className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-ink-100"
+              aria-haspopup="menu"
+              aria-expanded={isOpen}
+            >
+              <Avatar name={user?.name} src={user?.avatar} size="sm" />
+              <span className="hidden text-left sm:block">
+                <span className="block text-sm font-medium text-ink-900">{user?.name}</span>
+                <span className="block text-xs text-ink-500">{ROLE_LABELS[user?.role]}</span>
+              </span>
+              <ChevronDown className="h-4 w-4 text-ink-500" aria-hidden="true" />
+            </button>
+
+            {isOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} role="presentation" />
+                <div
+                  role="menu"
+                  className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl border border-ink-100 bg-white shadow-card"
+                >
+                  <div className="border-b border-ink-100 px-4 py-3">
+                    <p className="truncate text-sm font-medium text-ink-900">{user?.name}</p>
+                    <p className="truncate text-xs text-ink-500">{user?.email}</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setIsOpen(false);
+                      setIsPasswordModalOpen(true);
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-50"
+                  >
+                    <KeyRound className="h-4 w-4 text-ink-500" aria-hidden="true" />
+                    Change password
+                  </button>
+                  <div className="border-t border-ink-100" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={logout}
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-rose-600 hover:bg-rose-50"
+                  >
+                    <LogOut className="h-4 w-4" aria-hidden="true" />
+                    Sign out
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setIsOpen(false);
-                    setIsPasswordModalOpen(true);
-                  }}
-                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-50"
-                >
-                  <KeyRound className="h-4 w-4 text-ink-500" aria-hidden="true" />
-                  Change password
-                </button>
-                <div className="border-t border-ink-100" />
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={logout}
-                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-rose-600 hover:bg-rose-50"
-                >
-                  <LogOut className="h-4 w-4" aria-hidden="true" />
-                  Sign out
-                </button>
-              </div>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
       </header>
 

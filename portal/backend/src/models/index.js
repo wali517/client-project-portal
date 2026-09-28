@@ -7,3 +7,5 @@ export { default as File } from './File.js';
 export { default as Message } from './Message.js';
 export { default as ActivityLog } from './ActivityLog.js';
 export { default as Revision } from './Revision.js';
+export { default as Notification } from './Notification.js';
+

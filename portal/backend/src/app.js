@@ -66,7 +66,9 @@ if (!env.isTest) {
 app.use('/api', globalLimiter);
 app.use('/uploads', express.static(path.resolve(env.uploadDir || 'uploads')));
 app.use('/api', routes);
+app.use('/', routes);
 app.use(notFoundHandler);
 app.use(errorHandler);
+
 
 export default app;

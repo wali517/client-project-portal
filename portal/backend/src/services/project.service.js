@@ -31,6 +31,8 @@ import {
   REVISION_STATUS,
   ROLES,
 } from "../constants/index.js";
+import { notifyUsers, getRecipientsForProject } from "./notification.service.js";
+
 
 const SORTABLE = [
   "createdAt",
@@ -317,6 +319,16 @@ export const changeProjectStatus = async (id, status, user, metadata = {}) => {
     metadata,
   });
 
+  const statusRecipients = await getRecipientsForProject(project, user);
+  await notifyUsers({
+    recipients: statusRecipients,
+    actor: user,
+    type: 'PROJECT_STATUS_CHANGED',
+    title: 'Project Status Updated',
+    message: `Project ${project.projectNumber || ''} status changed to ${status.replace('_', ' ')}`,
+    project: project._id,
+  });
+
   return project;
 };
 
@@ -386,6 +398,15 @@ export const assignStaff = async (id, staffIds, user) => {
     });
   }
 
+  await notifyUsers({
+    recipients: staffUsers.map((s) => s._id),
+    actor: user,
+    type: 'PROJECT_ASSIGNED',
+    title: 'Project Assigned',
+    message: `You have been assigned to project ${project.projectNumber || ''}: ${project.title}`,
+    project: project._id,
+  });
+
   if (project.status === PROJECT_STATUS.NOT_STARTED) {
     const previousStatus = project.status;
     project.status = PROJECT_STATUS.ASSIGNED;
@@ -399,6 +420,7 @@ export const assignStaff = async (id, staffIds, user) => {
       newValue: { status: project.status },
     });
   }
+
 
   return ProjectAssignment.find({
     project: project._id,

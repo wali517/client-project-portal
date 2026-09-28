@@ -28,8 +28,8 @@ export const env = {
     : path.join(backendRoot, process.env.UPLOAD_DIR || "src/uploads"),
   maxFileSizeMb: toInt(process.env.MAX_FILE_SIZE_MB, 15),
   rateLimitWindowMin: toInt(process.env.RATE_LIMIT_WINDOW_MIN, 15),
-  rateLimitMax: toInt(process.env.RATE_LIMIT_MAX, 300),
-  authRateLimitMax: toInt(process.env.AUTH_RATE_LIMIT_MAX, 10),
+  rateLimitMax: toInt(process.env.RATE_LIMIT_MAX, 5000),
+  authRateLimitMax: toInt(process.env.AUTH_RATE_LIMIT_MAX, 200),
   smtp: {
     service: process.env.SMTP_SERVICE || "",
     host: process.env.SMTP_HOST || "",

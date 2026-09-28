@@ -1,8 +1,14 @@
 import Message from "../models/Message.js";
+import User from "../models/User.js";
 import { logActivity } from "./activity.service.js";
 import { loadProjectForUser, loadRequestForUser } from "./access.service.js";
 import { parsePagination, buildPaginationMeta } from "../utils/pagination.js";
 import { ACTIVITY_ACTIONS, ROLES } from "../constants/index.js";
+import {
+  notifyUsers,
+  getRecipientsForProject,
+  markThreadNotificationsRead,
+} from "./notification.service.js";
 
 const buildMessageFilter = (baseFilter, query, user) => {
   const filter = { ...baseFilter };
@@ -72,10 +78,18 @@ export const listProjectMessages = async (projectId, query, user) => {
     return item.channel !== "STAFF" && senderRole !== ROLES.STAFF;
   });
 
-  await Message.updateMany(
-    { ...filter, "readBy.user": { $ne: user._id }, sender: { $ne: user._id } },
-    { $push: { readBy: { user: user._id, readAt: new Date() } } },
-  );
+  if (query.markRead !== 'false') {
+    await Message.updateMany(
+      { ...filter, "readBy.user": { $ne: user._id }, sender: { $ne: user._id } },
+      { $push: { readBy: { user: user._id, readAt: new Date() } } },
+    );
+
+    await markThreadNotificationsRead(user._id, {
+      project: project._id,
+      channel: targetChannel,
+    });
+  }
+
 
   return {
     items: cleanItems.reverse(),
@@ -108,6 +122,17 @@ export const sendProjectMessage = async (
     project: project._id,
     action: ACTIVITY_ACTIONS.MESSAGE_SENT,
     newValue: { preview: message.slice(0, 120), channel: messageChannel },
+  });
+
+  const recipients = await getRecipientsForProject(project, user, messageChannel);
+  await notifyUsers({
+    recipients,
+    actor: user,
+    type: 'MESSAGE',
+    title: `New message on ${project.projectNumber || 'Project'}`,
+    message: `${user.name}: "${message.length > 80 ? message.slice(0, 80) + '…' : message}"`,
+    project: project._id,
+    channel: messageChannel,
   });
 
   return doc.populate("sender", "name email role avatar");
@@ -150,10 +175,18 @@ export const listRequestMessages = async (requestId, query, user) => {
     return item.channel !== "STAFF" && senderRole !== ROLES.STAFF;
   });
 
-  await Message.updateMany(
-    { ...filter, "readBy.user": { $ne: user._id }, sender: { $ne: user._id } },
-    { $push: { readBy: { user: user._id, readAt: new Date() } } },
-  );
+  if (query.markRead !== 'false') {
+    await Message.updateMany(
+      { ...filter, "readBy.user": { $ne: user._id }, sender: { $ne: user._id } },
+      { $push: { readBy: { user: user._id, readAt: new Date() } } },
+    );
+
+    await markThreadNotificationsRead(user._id, {
+      request: request._id,
+      channel: targetChannel,
+    });
+  }
+
 
   return {
     items: cleanItems.reverse(),
@@ -188,5 +221,22 @@ export const sendRequestMessage = async (
     newValue: { preview: message.slice(0, 120), channel: messageChannel },
   });
 
+  const admins = await User.find({ role: ROLES.ADMIN, isActive: true }).select('_id');
+  const recipientIds = admins.map((a) => a._id);
+  if (messageChannel === 'CLIENT' && request.client) {
+    recipientIds.push(request.client);
+  }
+
+  await notifyUsers({
+    recipients: recipientIds,
+    actor: user,
+    type: 'MESSAGE',
+    title: `New message on Request ${request.requestNumber || ''}`,
+    message: `${user.name}: "${message.length > 80 ? message.slice(0, 80) + '…' : message}"`,
+    request: request._id,
+    channel: messageChannel,
+  });
+
   return doc.populate("sender", "name email role avatar");
 };
+

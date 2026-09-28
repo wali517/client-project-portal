@@ -8,7 +8,9 @@ import DataState from '../../components/ui/DataState.jsx';
 import { CardSkeleton } from '../../components/ui/Skeleton.jsx';
 import ProjectTable from '../../components/projects/ProjectTable.jsx';
 import ActivityTimeline from '../../components/activity/ActivityTimeline.jsx';
+import NotificationBox from '../../components/notifications/NotificationBox.jsx';
 import useFetch from '../../hooks/useFetch.js';
+
 import useAuth from '../../hooks/useAuth.js';
 import { getDashboard } from '../../api/dashboardApi.js';
 import { formatDate, isOverdue } from '../../utils/format.js';
@@ -63,8 +65,10 @@ const StaffDashboard = () => {
           </Card>
 
           <div className="space-y-5">
+            <NotificationBox />
             <Card>
               <CardHeader title="Upcoming deadlines" />
+
               <CardBody>
                 {summary?.upcomingDeadlines?.length ? (
                   <ul className="space-y-3">

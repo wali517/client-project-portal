@@ -10,7 +10,9 @@ import { CardSkeleton } from '../../components/ui/Skeleton.jsx';
 import RequestTable from '../../components/requests/RequestTable.jsx';
 import ProjectTable from '../../components/projects/ProjectTable.jsx';
 import ActivityTimeline from '../../components/activity/ActivityTimeline.jsx';
+import NotificationBox from '../../components/notifications/NotificationBox.jsx';
 import useFetch from '../../hooks/useFetch.js';
+
 import { getDashboard } from '../../api/dashboardApi.js';
 
 const AdminDashboard = () => {
@@ -91,19 +93,23 @@ const AdminDashboard = () => {
             </Card>
           </div>
 
-          <Card>
-            <CardHeader
-              title="Recent activity"
-              action={
-                <Link to="/admin/activity" className="text-sm text-brand-600 hover:underline">
-                  Full history
-                </Link>
-              }
-            />
-            <CardBody>
-              <ActivityTimeline entries={summary?.activity || []} />
-            </CardBody>
-          </Card>
+          <div className="space-y-5">
+            <NotificationBox />
+            <Card>
+              <CardHeader
+                title="Recent activity"
+                action={
+                  <Link to="/admin/activity" className="text-sm text-brand-600 hover:underline">
+                    Full history
+                  </Link>
+                }
+              />
+              <CardBody>
+                <ActivityTimeline entries={summary?.activity || []} />
+              </CardBody>
+            </Card>
+          </div>
+
         </div>
       </DataState>
     </PageContainer>

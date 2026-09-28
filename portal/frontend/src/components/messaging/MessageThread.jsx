@@ -8,13 +8,13 @@ import useAuth from '../../hooks/useAuth.js';
 import { ROLES } from '../../constants/index.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
-const SingleChatBox = ({ fetchMessages, sendMessage, channel, title, onUnreadChange }) => {
+const SingleChatBox = ({ fetchMessages, sendMessage, channel, title, onUnreadChange, isActive = true }) => {
   const { user } = useAuth();
   const [isSending, setIsSending] = useState(false);
 
   const fetchChannelMessages = useCallback(
-    () => fetchMessages(channel ? { channel } : {}),
-    [fetchMessages, channel]
+    () => fetchMessages(channel ? { channel, markRead: isActive ? 'true' : 'false' } : { markRead: isActive ? 'true' : 'false' }),
+    [fetchMessages, channel, isActive]
   );
 
   const { data, isLoading, error, refetch, setData } = useFetch(fetchChannelMessages, [fetchChannelMessages]);
@@ -23,60 +23,49 @@ const SingleChatBox = ({ fetchMessages, sendMessage, channel, title, onUnreadCha
   const messages = data?.data || [];
   const knownMsgIdsRef = useRef(null);
 
-  // Pop up toast notification when a new message arrives from another user
+  // When tab becomes active, trigger a fetch with markRead: 'true' to mark thread read
   useEffect(() => {
-    if (!messages.length) return;
-    const currentIds = new Set(messages.map((m) => String(m._id || m.id)));
-    if (knownMsgIdsRef.current === null) {
-      knownMsgIdsRef.current = currentIds;
-      return;
+    if (isActive) {
+      fetchChannelMessages().then((response) => {
+        if (response?.data) setData(response);
+      }).catch(() => {});
     }
-    messages.forEach((msg) => {
-      const msgId = String(msg._id || msg.id);
-      if (!knownMsgIdsRef.current.has(msgId)) {
-        knownMsgIdsRef.current.add(msgId);
-        const isFromOther = String(msg.sender?._id || msg.sender) !== String(user?._id);
-        if (isFromOther) {
-          const senderName = msg.sender?.name || 'User';
-          const preview = msg.message?.length > 45 ? `${msg.message.slice(0, 45)}…` : msg.message;
-          toast(`New message from ${senderName}: "${preview}"`, {
-            icon: '💬',
-            id: `new-msg-${msgId}`,
-          });
-        }
-      }
-    });
-  }, [messages, user]);
+  }, [isActive, fetchChannelMessages, setData]);
 
-  // Live polling every 2.5 seconds for real-time live chat without page refresh
+  const isRateLimitedRef = useRef(false);
+
+  // Live polling for real-time live chat without page refresh
   useEffect(() => {
     const interval = setInterval(async () => {
-      if (isPollingRef.current) return;
+      if (document.hidden || isPollingRef.current || isRateLimitedRef.current) return;
       isPollingRef.current = true;
       try {
         const response = await fetchChannelMessages();
         if (response?.data) {
           setData(response);
         }
-      } catch {
-        // silent background poll error
+      } catch (err) {
+        if (err?.response?.status === 429) {
+          isRateLimitedRef.current = true;
+          setTimeout(() => { isRateLimitedRef.current = false; }, 15000);
+        }
       } finally {
         isPollingRef.current = false;
       }
-    }, 2500);
+    }, 4000);
 
     return () => clearInterval(interval);
   }, [fetchChannelMessages, setData]);
 
+  const unreadCount = messages.filter(
+    (m) =>
+      m.sender?._id !== user?._id &&
+      (!m.readBy || !m.readBy.some((r) => String(r.user?._id || r.user) === String(user?._id)))
+  ).length;
+
   useEffect(() => {
-    if (!messages.length || !user?._id) return;
-    const unread = messages.filter(
-      (m) =>
-        m.sender?._id !== user._id &&
-        (!m.readBy || !m.readBy.some((r) => String(r.user?._id || r.user) === String(user._id)))
-    ).length;
-    onUnreadChange?.(unread);
-  }, [messages, user, onUnreadChange]);
+    onUnreadChange?.(unreadCount);
+  }, [unreadCount, onUnreadChange]);
 
   const send = useCallback(
     async (text) => {
@@ -105,12 +94,20 @@ const SingleChatBox = ({ fetchMessages, sendMessage, channel, title, onUnreadCha
     <div className="flex flex-col border border-ink-200 rounded-xl bg-white p-4 shadow-sm space-y-4">
       {title && (
         <div className="border-b border-ink-100 pb-2 flex items-center justify-between">
-          <h3 className="font-semibold text-ink-900 text-sm">{title}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-ink-900 text-sm">{title}</h3>
+            {unreadCount > 0 && (
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-500 text-white font-bold shadow-sm animate-pulse">
+                {unreadCount} unread
+              </span>
+            )}
+          </div>
           <span className="text-xs px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 font-medium">
             {channel === 'CLIENT' ? 'Client <-> Admin' : 'Staff <-> Admin'}
           </span>
         </div>
       )}
+
       <DataState isLoading={isLoading} error={error} onRetry={refetch} loadingLabel="Loading messages…">
         <MessageList messages={messages} currentUserId={user?._id} />
       </DataState>
@@ -123,7 +120,7 @@ const SingleChatBox = ({ fetchMessages, sendMessage, channel, title, onUnreadCha
  * Works for both project and request conversations: the caller passes the
  * matching list/send functions from the API layer.
  */
-const MessageThread = ({ fetchMessages, sendMessage, onUnreadChange }) => {
+const MessageThread = ({ fetchMessages, sendMessage, onUnreadChange, isActive = true }) => {
   const { user } = useAuth();
   const isAdmin = user?.role === ROLES.ADMIN;
 
@@ -136,6 +133,7 @@ const MessageThread = ({ fetchMessages, sendMessage, onUnreadChange }) => {
           channel="CLIENT"
           title="Client Chat Box"
           onUnreadChange={onUnreadChange}
+          isActive={isActive}
         />
         <SingleChatBox
           fetchMessages={fetchMessages}
@@ -143,6 +141,7 @@ const MessageThread = ({ fetchMessages, sendMessage, onUnreadChange }) => {
           channel="STAFF"
           title="Staff Chat Box"
           onUnreadChange={onUnreadChange}
+          isActive={isActive}
         />
       </div>
     );
@@ -158,8 +157,10 @@ const MessageThread = ({ fetchMessages, sendMessage, onUnreadChange }) => {
       channel={userChannel}
       title={chatTitle}
       onUnreadChange={onUnreadChange}
+      isActive={isActive}
     />
   );
 };
+
 
 export default MessageThread;

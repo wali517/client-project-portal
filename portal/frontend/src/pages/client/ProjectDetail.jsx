@@ -80,7 +80,7 @@ const ClientProjectDetail = () => {
                       { value: 'files', label: 'Delivered work', count: deliverables.length },
                       { value: 'all-files', label: 'All files', count: files.length },
                       { value: 'revisions', label: 'Revisions', count: revisions.length },
-                      { value: 'messages', label: 'Messages', count: unreadCount || undefined },
+                      { value: 'messages', label: 'Messages', count: unreadCount, hideZero: true },
                       { value: 'activity', label: 'Activity' },
                     ]}
                   />
@@ -109,13 +109,16 @@ const ClientProjectDetail = () => {
 
                     {tab === 'revisions' && <RevisionList revisions={revisions} />}
 
-                    {tab === 'messages' && (
+                    <div className={tab === 'messages' ? 'block' : 'hidden'}>
                       <MessageThread
                         fetchMessages={fetchMessages}
                         sendMessage={sendMessage}
                         onUnreadChange={setUnreadCount}
+                        isActive={tab === 'messages'}
                       />
-                    )}
+                    </div>
+
+
 
                     {tab === 'activity' && (
                       <DataState

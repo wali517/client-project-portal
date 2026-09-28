@@ -68,7 +68,7 @@ const AdminRequestDetail = () => {
                 onChange={setTab}
                 tabs={[
                   { value: 'details', label: 'Attachments', count: files.length },
-                  { value: 'messages', label: 'Messages', count: unreadCount || undefined },
+                  { value: 'messages', label: 'Messages', count: unreadCount, hideZero: true },
                   { value: 'activity', label: 'Activity' },
                 ]}
               />
@@ -84,13 +84,16 @@ const AdminRequestDetail = () => {
                   </div>
                 )}
 
-                {tab === 'messages' && (
+                <div className={tab === 'messages' ? 'block' : 'hidden'}>
                   <MessageThread
                     fetchMessages={fetchMessages}
                     sendMessage={sendMessage}
                     onUnreadChange={setUnreadCount}
+                    isActive={tab === 'messages'}
                   />
-                )}
+                </div>
+
+
 
                 {tab === 'activity' && (
                   <DataState

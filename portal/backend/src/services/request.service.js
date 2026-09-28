@@ -1,3 +1,4 @@
+import User from "../models/User.js";
 import Request from "../models/Request.js";
 import File from "../models/File.js";
 import Message from "../models/Message.js";
@@ -13,6 +14,7 @@ import { logActivity } from "./activity.service.js";
 import { generateRequestNumber } from "./numbering.service.js";
 import { loadRequestForUser } from "./access.service.js";
 import { createProjectFromRequest, assignStaff } from "./project.service.js";
+import { notifyUsers } from "./notification.service.js";
 import {
   ACTIVITY_ACTIONS,
   REQUEST_STATUS,
@@ -102,8 +104,19 @@ export const createRequest = async (payload, user) => {
     newValue: { requestNumber, status: request.status, title: request.title },
   });
 
+  const admins = await User.find({ role: ROLES.ADMIN, isActive: true }).select('_id');
+  await notifyUsers({
+    recipients: admins.map((a) => a._id),
+    actor: user,
+    type: 'REQUEST_CREATED',
+    title: 'New Request Submitted',
+    message: `New request ${requestNumber} submitted by ${user.name}: "${request.title}"`,
+    request: request._id,
+  });
+
   return request;
 };
+
 
 export const updateRequest = async (id, payload, user) => {
   const request = await loadRequestForUser(id, user, { populate: false });

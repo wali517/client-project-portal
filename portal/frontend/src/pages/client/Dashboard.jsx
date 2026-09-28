@@ -10,7 +10,9 @@ import { CardSkeleton } from '../../components/ui/Skeleton.jsx';
 import RequestTable from '../../components/requests/RequestTable.jsx';
 import ProjectTable from '../../components/projects/ProjectTable.jsx';
 import ActivityTimeline from '../../components/activity/ActivityTimeline.jsx';
+import NotificationBox from '../../components/notifications/NotificationBox.jsx';
 import useFetch from '../../hooks/useFetch.js';
+
 import useAuth from '../../hooks/useAuth.js';
 import { getDashboard } from '../../api/dashboardApi.js';
 
@@ -89,12 +91,16 @@ const ClientDashboard = () => {
             </Card>
           </div>
 
-          <Card>
-            <CardHeader title="Recent activity" />
-            <CardBody>
-              <ActivityTimeline entries={summary?.activity || []} />
-            </CardBody>
-          </Card>
+          <div className="space-y-5">
+            <NotificationBox />
+            <Card>
+              <CardHeader title="Recent activity" />
+              <CardBody>
+                <ActivityTimeline entries={summary?.activity || []} />
+              </CardBody>
+            </Card>
+          </div>
+
         </div>
       </DataState>
     </PageContainer>

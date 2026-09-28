@@ -23,6 +23,7 @@ export const AuthProvider = ({ children }) => {
   }, [signOutLocally]);
 
   useEffect(() => {
+    let timerId = null;
     const bootstrap = async () => {
       if (!getStoredToken()) {
         setStatus('anonymous');
@@ -32,11 +33,19 @@ export const AuthProvider = ({ children }) => {
         const response = await authApi.me();
         setUser(response.data.user);
         setStatus('authenticated');
-      } catch {
+      } catch (err) {
+        if (err?.response?.status === 429) {
+          // If server returned 429 rate limit, do NOT sign out! Retry bootstrap after 4 seconds.
+          timerId = setTimeout(bootstrap, 4000);
+          return;
+        }
         signOutLocally();
       }
     };
     bootstrap();
+    return () => {
+      if (timerId) clearTimeout(timerId);
+    };
   }, [signOutLocally]);
 
   const login = useCallback(async (credentials) => {
