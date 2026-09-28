@@ -1,4 +1,4 @@
-import { sendSuccess } from '../utils/response.js';
+import { sendSuccess } from '../utils/apiResponse.js';
 import * as notificationService from '../services/notification.service.js';
 
 export const listNotifications = async (req, res, next) => {
