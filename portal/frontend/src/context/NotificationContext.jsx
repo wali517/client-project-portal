@@ -1,4 +1,4 @@
-import { createContext, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import useAuth from '../hooks/useAuth.js';
@@ -10,7 +10,7 @@ import {
 import { getDashboard } from '../api/dashboardApi.js';
 import { ACTIVITY_LABELS, ROLES } from '../constants/index.js';
 
-export const NotificationContext = createContext(null);
+import { NotificationContext } from './notificationContextObject.js';
 
 const humanize = (val = '') =>
   String(val)
@@ -37,22 +37,10 @@ const describeChange = (entry) => {
 
 const isProjectMovementType = (type = '') => {
   const t = String(type).toUpperCase();
-  if (t.includes('LOGIN') || t.includes('LOGOUT') || t.includes('AUTH') || t.includes('USER_')) {
+  if (t.includes('LOGIN') || t.includes('LOGOUT') || t.includes('AUTH') || t.includes('USER_LOG')) {
     return false;
   }
-  return (
-    t.includes('MESSAGE') ||
-    t.includes('STAFF') ||
-    t.includes('ASSIGN') ||
-    t.includes('STATUS') ||
-    t.includes('WORK') ||
-    t.includes('REVISION') ||
-    t.includes('REQUEST') ||
-    t.includes('PROJECT') ||
-    t.includes('FILE') ||
-    t.includes('APPROV') ||
-    t.includes('REJECT')
-  );
+  return true;
 };
 
 export const NotificationProvider = ({ children }) => {
@@ -98,10 +86,12 @@ export const NotificationProvider = ({ children }) => {
       if (!isEndpointMissingRef.current) {
         try {
           const response = await listNotifications({ limit: 40 });
-          const payload = response?.data;
-          if (payload) {
-            rawItems = payload.items || [];
-          }
+          const items =
+            response?.data?.items ||
+            response?.data ||
+            response?.items ||
+            (Array.isArray(response) ? response : []);
+          rawItems = Array.isArray(items) ? items : items?.items || [];
         } catch (err) {
           if (err?.response?.status === 404) {
             isEndpointMissingRef.current = true;
@@ -182,7 +172,8 @@ export const NotificationProvider = ({ children }) => {
 
           let icon = '🔔';
           if (n.type === 'MESSAGE' || n.type === 'MESSAGE_SENT') icon = '💬';
-          else if (n.type?.includes('STAFF') || n.type?.includes('ASSIGNED')) icon = '👤';
+          else if (n.type?.includes('CANCEL')) icon = '🚫';
+          else if (n.type?.includes('STAFF') || n.type?.includes('ASSIGNED') || n.type?.includes('REOPEN')) icon = '👤';
           else if (n.type?.includes('STATUS') || n.type?.includes('WORK')) icon = '🔄';
           else if (n.type?.includes('REVISION')) icon = '📝';
           else if (n.type?.includes('REQUEST')) icon = '📥';
@@ -239,9 +230,20 @@ export const NotificationProvider = ({ children }) => {
       } finally {
         isPollingRef.current = false;
       }
-    }, 5000);
+    }, 4000);
 
-    return () => clearInterval(interval);
+    // Refresh immediately when the tab becomes visible / focused again
+    const onVisible = () => {
+      if (!document.hidden) fetchLatest();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
   }, [user, fetchLatest]);
 
   const markAsRead = useCallback(async (id) => {

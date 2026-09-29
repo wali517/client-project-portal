@@ -52,7 +52,7 @@ const SingleChatBox = ({ fetchMessages, sendMessage, channel, title, onUnreadCha
       } finally {
         isPollingRef.current = false;
       }
-    }, 4000);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, [fetchChannelMessages, setData]);

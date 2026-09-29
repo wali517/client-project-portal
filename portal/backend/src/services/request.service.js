@@ -153,6 +153,16 @@ export const updateRequest = async (id, payload, user) => {
     },
   });
 
+  const admins = await User.find({ role: ROLES.ADMIN, isActive: true }).select('_id');
+  await notifyUsers({
+    recipients: admins.map((a) => a._id),
+    actor: user,
+    type: 'REQUEST_UPDATED',
+    title: 'Request Updated',
+    message: `Request ${request.requestNumber || ''} \"${request.title}\" was updated by ${user.name}`,
+    request: request._id,
+  });
+
   return request;
 };
 
@@ -208,6 +218,33 @@ export const changeRequestStatus = async (id, status, user, extra = {}) => {
     newValue: { status },
     metadata: extra,
   });
+
+  if (request.client) {
+    const isApproved = status === REQUEST_STATUS.APPROVED;
+    const isRejected = status === REQUEST_STATUS.REJECTED;
+    const title = isApproved
+      ? 'Request Approved'
+      : isRejected
+      ? 'Request Rejected'
+      : 'Request Status Updated';
+    const message = isApproved
+      ? `Your request ${request.requestNumber || ''} "${request.title}" has been approved!`
+      : isRejected
+      ? `Your request ${request.requestNumber || ''} "${request.title}" was rejected: ${extra.rejectionReason || 'No reason specified'}`
+      : `Request ${request.requestNumber || ''} status changed to ${status}`;
+
+    const admins = await User.find({ role: ROLES.ADMIN, isActive: true }).select('_id');
+    const recipients = [request.client, ...admins.map((a) => a._id)];
+
+    await notifyUsers({
+      recipients,
+      actor: user,
+      type: isApproved ? 'REQUEST_APPROVED' : isRejected ? 'REQUEST_REJECTED' : 'REQUEST_STATUS_CHANGED',
+      title,
+      message,
+      request: request._id,
+    });
+  }
 
   return request;
 };

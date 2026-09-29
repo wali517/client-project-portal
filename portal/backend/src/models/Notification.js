@@ -4,22 +4,7 @@ const notificationSchema = new mongoose.Schema(
   {
     recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
-    type: {
-      type: String,
-      enum: [
-        'MESSAGE',
-        'PROJECT_ASSIGNED',
-        'PROJECT_UNASSIGNED',
-        'PROJECT_STATUS_CHANGED',
-        'WORK_SUBMITTED',
-        'REVISION_REQUESTED',
-        'PROJECT_APPROVED',
-        'REQUEST_CREATED',
-        'REQUEST_STATUS_CHANGED',
-      ],
-      required: true,
-      index: true,
-    },
+    type: { type: String, required: true, index: true },
     title: { type: String, required: true },
     message: { type: String, required: true },
     project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', index: true },

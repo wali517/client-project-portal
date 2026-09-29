@@ -278,7 +278,7 @@ const ProjectActions = ({ project, user, onChanged, onDeleted }) => {
         isOpen={dialog === 'cancel'}
         onClose={close}
         title="Cancel this project?"
-        description="Cancelling stops all work. This cannot be undone."
+        description="Cancelling stops all work. You can reopen it later by assigning staff again or changing its status."
         footer={
           <>
             <Button variant="secondary" onClick={close} disabled={isSaving}>

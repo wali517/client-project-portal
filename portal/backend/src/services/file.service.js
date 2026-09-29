@@ -7,6 +7,7 @@ import { logActivity } from "./activity.service.js";
 import { loadProjectForUser, loadRequestForUser } from "./access.service.js";
 import { sameId } from "../utils/objectId.js";
 import { ACTIVITY_ACTIONS, FILE_CATEGORY, ROLES } from "../constants/index.js";
+import { notifyUsers, getRecipientsForProject } from "./notification.service.js";
 
 import fs from "node:fs/promises";
 
@@ -90,6 +91,18 @@ export const saveUploadedFiles = async ({
     });
 
     created.push(doc);
+  }
+
+  if (project && created.length > 0) {
+    const fileRecipients = await getRecipientsForProject(project, user);
+    await notifyUsers({
+      recipients: fileRecipients,
+      actor: user,
+      type: 'FILE_UPLOADED',
+      title: 'New File Uploaded',
+      message: `${user.name} uploaded ${created.length} file(s) on project ${project.projectNumber || ''}`,
+      project: project._id,
+    });
   }
 
   return created;
@@ -223,6 +236,18 @@ export const deleteFile = async (fileId, user) => {
     action: ACTIVITY_ACTIONS.FILE_DELETED,
     previousValue: { fileName: file.originalName },
   });
+
+  if (file.project) {
+    const delRecipients = await getRecipientsForProject(file.project, user);
+    await notifyUsers({
+      recipients: delRecipients,
+      actor: user,
+      type: 'FILE_DELETED',
+      title: 'File Deleted',
+      message: `${user.name} deleted the file "${file.originalName}"`,
+      project: file.project?._id || file.project,
+    });
+  }
 
   return file;
 };

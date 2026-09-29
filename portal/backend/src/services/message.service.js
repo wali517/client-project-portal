@@ -1,5 +1,4 @@
 import Message from "../models/Message.js";
-import User from "../models/User.js";
 import { logActivity } from "./activity.service.js";
 import { loadProjectForUser, loadRequestForUser } from "./access.service.js";
 import { parsePagination, buildPaginationMeta } from "../utils/pagination.js";
@@ -7,7 +6,9 @@ import { ACTIVITY_ACTIONS, ROLES } from "../constants/index.js";
 import {
   notifyUsers,
   getRecipientsForProject,
+  getAdminIds,
   markThreadNotificationsRead,
+  AUDIENCE,
 } from "./notification.service.js";
 
 const buildMessageFilter = (baseFilter, query, user) => {
@@ -124,7 +125,10 @@ export const sendProjectMessage = async (
     newValue: { preview: message.slice(0, 120), channel: messageChannel },
   });
 
-  const recipients = await getRecipientsForProject(project, user, messageChannel);
+  // Staff/client messages notify admins only; an admin's reply notifies only
+  // the party in that channel.
+  const chatAudience = messageChannel === 'STAFF' ? AUDIENCE.STAFF : AUDIENCE.CLIENT;
+  const recipients = await getRecipientsForProject(project, user, chatAudience);
   await notifyUsers({
     recipients,
     actor: user,
@@ -221,9 +225,8 @@ export const sendRequestMessage = async (
     newValue: { preview: message.slice(0, 120), channel: messageChannel },
   });
 
-  const admins = await User.find({ role: ROLES.ADMIN, isActive: true }).select('_id');
-  const recipientIds = admins.map((a) => a._id);
-  if (messageChannel === 'CLIENT' && request.client) {
+  const recipientIds = await getAdminIds();
+  if (user.role === ROLES.ADMIN && messageChannel === 'CLIENT' && request.client) {
     recipientIds.push(request.client);
   }
 

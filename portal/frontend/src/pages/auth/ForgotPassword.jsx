@@ -45,7 +45,7 @@ const ForgotPassword = () => {
           If that email belongs to an account, a reset link is on its way to your mailbox. The link expires in 30 minutes.
         </p>
 
-        {resetData?.token && (
+        {import.meta.env.DEV && resetData?.token && (
           <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-4 text-left space-y-2">
             <p className="text-xs font-semibold text-brand-900">Direct Reset Link (Dev / Local Mode):</p>
             <p className="text-xs text-brand-700 break-all">{resetData.resetUrl || `/reset-password?token=${resetData.token}`}</p>
