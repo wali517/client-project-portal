@@ -6,17 +6,8 @@ export const getStoredToken = () => localStorage.getItem(TOKEN_KEY);
 export const setStoredToken = (token) => localStorage.setItem(TOKEN_KEY, token);
 export const clearStoredToken = () => localStorage.removeItem(TOKEN_KEY);
 
-// Deployed backend is the default so the app never silently points at localhost.
-// Override with VITE_API_URL (e.g. http://localhost:5000/api when running the backend locally).
-const DEFAULT_API_URL = 'https://backend-nine-xi-82.vercel.app/api';
-
-const resolveBaseUrl = () => {
-  const raw = String(import.meta.env.VITE_API_URL || DEFAULT_API_URL).trim().replace(/\/+$/, '');
-  return /\/api$/i.test(raw) ? raw : `${raw}/api`;
-};
-
 const api = axios.create({
-  baseURL: resolveBaseUrl(),
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
   headers: { 'Content-Type': 'application/json' },
   timeout: 30000,
 });

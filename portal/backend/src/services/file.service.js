@@ -237,17 +237,5 @@ export const deleteFile = async (fileId, user) => {
     previousValue: { fileName: file.originalName },
   });
 
-  if (file.project) {
-    const delRecipients = await getRecipientsForProject(file.project, user);
-    await notifyUsers({
-      recipients: delRecipients,
-      actor: user,
-      type: 'FILE_DELETED',
-      title: 'File Deleted',
-      message: `${user.name} deleted the file "${file.originalName}"`,
-      project: file.project?._id || file.project,
-    });
-  }
-
   return file;
 };

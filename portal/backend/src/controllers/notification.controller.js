@@ -3,7 +3,7 @@ import * as notificationService from '../services/notification.service.js';
 
 export const listNotifications = async (req, res, next) => {
   try {
-    const data = await notificationService.getUserNotifications(req.user, req.query);
+    const data = await notificationService.getUserNotifications(req.user._id, req.query);
     return sendSuccess(res, { message: 'Notifications loaded', data });
   } catch (error) {
     return next(error);
@@ -12,7 +12,7 @@ export const listNotifications = async (req, res, next) => {
 
 export const getUnreadCounts = async (req, res, next) => {
   try {
-    const data = await notificationService.getUnreadCounts(req.user);
+    const data = await notificationService.getUnreadCounts(req.user._id);
     return sendSuccess(res, { message: 'Unread counts loaded', data });
   } catch (error) {
     return next(error);

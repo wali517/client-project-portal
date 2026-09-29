@@ -3,7 +3,6 @@ import Project from '../models/Project.js';
 import User from '../models/User.js';
 import ActivityLog from '../models/ActivityLog.js';
 import { getAssignedProjectIds } from './access.service.js';
-import { buildActivityVisibility } from './activity.service.js';
 import {
   ACTIVE_PROJECT_STATUSES,
   PROJECT_STATUS,
@@ -81,7 +80,7 @@ const staffSummary = async (user) => {
         .limit(5)
         .populate('client', 'name company'),
       recentProjects(base),
-      ActivityLog.find({ project: { $in: ids }, ...buildActivityVisibility(user) }).populate('user', 'name role').sort('-createdAt').limit(10),
+      ActivityLog.find({ project: { $in: ids } }).populate('user', 'name role').sort('-createdAt').limit(10),
     ]);
 
   return {
@@ -111,10 +110,7 @@ const clientSummary = async (user) => {
       Project.countDocuments({ ...base, status: PROJECT_STATUS.COMPLETED }),
       recentRequests(base),
       recentProjects(base),
-      ActivityLog.find({
-        $or: [{ project: { $in: projectIds } }, { request: { $in: requestIds } }],
-        ...buildActivityVisibility(user),
-      })
+      ActivityLog.find({ $or: [{ project: { $in: projectIds } }, { request: { $in: requestIds } }] })
         .populate('user', 'name role')
         .sort('-createdAt')
         .limit(10),

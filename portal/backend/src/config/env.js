@@ -44,10 +44,6 @@ export const env = {
   },
 };
 
-if (env.isProduction && !process.env.CLIENT_URL) {
-  console.warn("CLIENT_URL is not set: password reset links will point to localhost. Set it to your deployed frontend URL.");
-}
-
 if (
   env.isProduction &&
   env.jwtSecret === "dev_only_insecure_secret_change_me"

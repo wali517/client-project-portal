@@ -2,10 +2,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import { sendSuccess } from "../utils/apiResponse.js";
 import * as requestService from "../services/request.service.js";
 import * as messageService from "../services/message.service.js";
-import {
-  listActivity,
-  buildActivityVisibility,
-} from "../services/activity.service.js";
+import { listActivity } from "../services/activity.service.js";
 import { loadRequestForUser } from "../services/access.service.js";
 import { parsePagination, buildPaginationMeta } from "../utils/pagination.js";
 import { REQUEST_STATUS } from "../constants/index.js";
@@ -126,7 +123,7 @@ export const getRequestActivity = asyncHandler(async (req, res) => {
   });
   const { page, limit, skip } = parsePagination(req.query);
   const { items, total } = await listActivity({
-    filter: { request: request._id, ...buildActivityVisibility(req.user) },
+    filter: { request: request._id },
     page,
     limit,
     skip,

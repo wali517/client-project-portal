@@ -61,31 +61,24 @@ export const forgotPassword = asyncHandler(async (req, res) => {
 
   if (!user || !user.isActive) return genericResponse();
 
-  const rawToken = user.createPasswordResetToken(env.passwordResetExpiresMin);
+  const rawToken = user.createPasswordResetToken(
+    env.passwordResetExpiresMin || 30,
+  );
   await user.save({ validateBeforeSave: false });
 
-  // Link that lands on the frontend Reset Password page (CLIENT_URL = deployed frontend URL)
-  // Strip any trailing slash and accidental "/api" so the link opens the frontend page, not the API
-  const baseUrl = String(env.clientUrl).trim().replace(/\/+$/, "").replace(/\/api$/i, "");
-  const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
-
+  const resetUrl = `${env.clientUrl}/reset-password?token=${rawToken}`;
   const mailResult = await sendPasswordResetEmail({
     to: user.email,
     name: user.name,
     resetUrl,
   });
+  logger.info(
+    `Password reset link generated for ${user.email} (expires in 30 min): ${resetUrl}`,
+  );
 
-  if (!env.isProduction) {
-    // Local development only: expose the link so the flow can be tested without a real mailbox.
-    logger.info(`Password reset link for ${user.email}: ${resetUrl}`);
-    return genericResponse({ resetUrl, token: rawToken, previewUrl: mailResult?.previewUrl || null });
-  }
-
-  if (!mailResult?.delivered) {
-    logger.error(`Password reset email could not be delivered to ${user.email}`);
-  }
-  // Never return the token in production: it would let anyone reset any account.
-  return genericResponse();
+  const isDevOrFallback =
+    !env.isProduction || !env.smtp.host || !mailResult?.delivered;
+  return genericResponse(isDevOrFallback ? { resetUrl, token: rawToken } : {});
 });
 
 export const resetPassword = asyncHandler(async (req, res) => {

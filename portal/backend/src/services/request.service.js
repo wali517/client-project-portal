@@ -153,16 +153,6 @@ export const updateRequest = async (id, payload, user) => {
     },
   });
 
-  const admins = await User.find({ role: ROLES.ADMIN, isActive: true }).select('_id');
-  await notifyUsers({
-    recipients: admins.map((a) => a._id),
-    actor: user,
-    type: 'REQUEST_UPDATED',
-    title: 'Request Updated',
-    message: `Request ${request.requestNumber || ''} \"${request.title}\" was updated by ${user.name}`,
-    request: request._id,
-  });
-
   return request;
 };
 

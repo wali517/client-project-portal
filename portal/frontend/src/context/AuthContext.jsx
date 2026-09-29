@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import * as authApi from '../api/authApi.js';
 import { clearStoredToken, getStoredToken, setStoredToken, setUnauthorizedHandler } from '../api/axios.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { AuthContext } from './authContextObject.js';
+
+export const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);

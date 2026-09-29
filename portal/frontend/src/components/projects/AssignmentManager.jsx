@@ -32,7 +32,7 @@ const AssignmentManager = ({ project, assignments = [], onChanged, readOnly = fa
     setIsSaving(true);
     try {
       await assignStaff(project._id, { staffIds: [selected] });
-      toast.success(project.status === 'CANCELLED' ? 'Project reopened and staff assigned' : 'Staff assigned');
+      toast.success('Staff assigned');
       setSelected('');
       onChanged?.();
     } catch (error) {

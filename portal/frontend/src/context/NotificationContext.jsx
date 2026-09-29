@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import useAuth from '../hooks/useAuth.js';
@@ -10,7 +10,7 @@ import {
 import { getDashboard } from '../api/dashboardApi.js';
 import { ACTIVITY_LABELS, ROLES } from '../constants/index.js';
 
-import { NotificationContext } from './notificationContextObject.js';
+export const NotificationContext = createContext(null);
 
 const humanize = (val = '') =>
   String(val)
@@ -172,8 +172,7 @@ export const NotificationProvider = ({ children }) => {
 
           let icon = '🔔';
           if (n.type === 'MESSAGE' || n.type === 'MESSAGE_SENT') icon = '💬';
-          else if (n.type?.includes('CANCEL')) icon = '🚫';
-          else if (n.type?.includes('STAFF') || n.type?.includes('ASSIGNED') || n.type?.includes('REOPEN')) icon = '👤';
+          else if (n.type?.includes('STAFF') || n.type?.includes('ASSIGNED')) icon = '👤';
           else if (n.type?.includes('STATUS') || n.type?.includes('WORK')) icon = '🔄';
           else if (n.type?.includes('REVISION')) icon = '📝';
           else if (n.type?.includes('REQUEST')) icon = '📥';
@@ -230,20 +229,9 @@ export const NotificationProvider = ({ children }) => {
       } finally {
         isPollingRef.current = false;
       }
-    }, 4000);
+    }, 2000);
 
-    // Refresh immediately when the tab becomes visible / focused again
-    const onVisible = () => {
-      if (!document.hidden) fetchLatest();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', onVisible);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', onVisible);
-    };
+    return () => clearInterval(interval);
   }, [user, fetchLatest]);
 
   const markAsRead = useCallback(async (id) => {

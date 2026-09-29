@@ -36,7 +36,7 @@ const ResetPassword = () => {
   return (
     <div>
       <h1 className="text-2xl font-semibold text-ink-900">Choose a new password</h1>
-      <p className="mt-1 text-sm text-ink-500">At least 8 characters, with an uppercase letter, a lowercase letter and a number.</p>
+      <p className="mt-1 text-sm text-ink-500">At least 8 characters, with an uppercase letter, a number and a symbol.</p>
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4" noValidate>
         {!tokenFromUrl && (

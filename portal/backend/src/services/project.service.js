@@ -31,12 +31,7 @@ import {
   REVISION_STATUS,
   ROLES,
 } from "../constants/index.js";
-import {
-  notifyUsers,
-  getRecipientsForProject,
-  getAdminIds,
-  AUDIENCE,
-} from "./notification.service.js";
+import { notifyUsers, getRecipientsForProject } from "./notification.service.js";
 
 
 const SORTABLE = [
@@ -188,7 +183,7 @@ export const createProject = async (payload, user) => {
     newValue: { projectNumber, title: project.title, status: project.status },
   });
 
-  const recipients = await getRecipientsForProject(project, user, AUDIENCE.CLIENT);
+  const recipients = await getRecipientsForProject(project, user);
   await notifyUsers({
     recipients,
     actor: user,
@@ -249,7 +244,7 @@ export const createProjectFromRequest = async (
     },
   });
 
-  const recipients = await getRecipientsForProject(project, user, AUDIENCE.CLIENT);
+  const recipients = await getRecipientsForProject(project, user);
   await notifyUsers({
     recipients,
     actor: user,
@@ -315,16 +310,6 @@ export const updateProject = async (id, payload, user) => {
     },
   });
 
-  const updateRecipients = await getRecipientsForProject(project, user);
-  await notifyUsers({
-    recipients: updateRecipients,
-    actor: user,
-    type: 'PROJECT_UPDATED',
-    title: 'Project Updated',
-    message: `Project ${project.projectNumber || ''}: \"${project.title}\" details were updated by ${user.name}`,
-    project: project._id,
-  });
-
   return project;
 };
 
@@ -339,10 +324,6 @@ export const changeProjectStatus = async (id, status, user, metadata = {}) => {
 
   const previousStatus = project.status;
   project.status = status;
-  if (previousStatus === PROJECT_STATUS.CANCELLED) {
-    project.cancelledAt = undefined;
-    project.cancellationReason = undefined;
-  }
   if (status === PROJECT_STATUS.UNDER_REVIEW) project.submittedAt = new Date();
   if (status === PROJECT_STATUS.IN_PROGRESS && project.progress === 0)
     project.progress = 5;
@@ -362,9 +343,9 @@ export const changeProjectStatus = async (id, status, user, metadata = {}) => {
   await notifyUsers({
     recipients: statusRecipients,
     actor: user,
-    type: previousStatus === PROJECT_STATUS.CANCELLED ? 'PROJECT_REOPENED' : 'PROJECT_STATUS_CHANGED',
-    title: previousStatus === PROJECT_STATUS.CANCELLED ? 'Project Reopened' : 'Project Status Updated',
-    message: `Project ${project.projectNumber || ''} status changed to ${status.replace(/_/g, ' ')}`,
+    type: 'PROJECT_STATUS_CHANGED',
+    title: 'Project Status Updated',
+    message: `Project ${project.projectNumber || ''} status changed to ${status.replace('_', ' ')}`,
     project: project._id,
   });
 
@@ -394,16 +375,6 @@ export const updateProgress = async (id, progress, user) => {
     action: ACTIVITY_ACTIONS.PROJECT_PROGRESS_UPDATED,
     previousValue: { progress: previous },
     newValue: { progress },
-  });
-
-  const progressRecipients = await getRecipientsForProject(project, user);
-  await notifyUsers({
-    recipients: progressRecipients,
-    actor: user,
-    type: 'PROJECT_PROGRESS_UPDATED',
-    title: 'Project Progress Updated',
-    message: `Project ${project.projectNumber || ''} progress changed from ${previous}% to ${progress}%`,
-    project: project._id,
   });
 
   return project;
@@ -447,15 +418,19 @@ export const assignStaff = async (id, staffIds, user) => {
     });
   }
 
-  // Move the project forward: NOT_STARTED -> ASSIGNED, and CANCELLED -> ASSIGNED (reopen)
-  const wasCancelled = project.status === PROJECT_STATUS.CANCELLED;
-  if (project.status === PROJECT_STATUS.NOT_STARTED || wasCancelled) {
+  const recipients = await getRecipientsForProject(project, user);
+  await notifyUsers({
+    recipients,
+    actor: user,
+    type: 'PROJECT_ASSIGNED',
+    title: 'Staff Assigned to Project',
+    message: `Staff assigned to project ${project.projectNumber || ''}: "${project.title}"`,
+    project: project._id,
+  });
+
+  if (project.status === PROJECT_STATUS.NOT_STARTED) {
     const previousStatus = project.status;
     project.status = PROJECT_STATUS.ASSIGNED;
-    if (wasCancelled) {
-      project.cancelledAt = undefined;
-      project.cancellationReason = undefined;
-    }
     await project.save();
     await logActivity({
       user,
@@ -464,28 +439,9 @@ export const assignStaff = async (id, staffIds, user) => {
       action: ACTIVITY_ACTIONS.PROJECT_STATUS_CHANGED,
       previousValue: { status: previousStatus },
       newValue: { status: project.status },
-      metadata: wasCancelled ? { reopened: true } : {},
     });
   }
 
-  // Only the staff who were just assigned (plus admins) are told - other staff
-  // and the client do not see internal staffing. A reopened project also
-  // tells the client, since the project is active again.
-  const assignRecipients = new Set([
-    ...(await getAdminIds()).map(String),
-    ...staffUsers.map((st) => String(st._id)),
-  ]);
-  if (wasCancelled && project.client) assignRecipients.add(String(project.client));
-  await notifyUsers({
-    recipients: [...assignRecipients],
-    actor: user,
-    type: wasCancelled ? 'PROJECT_REOPENED' : 'PROJECT_ASSIGNED',
-    title: wasCancelled ? 'Project Reopened & Reassigned' : 'Staff Assigned to Project',
-    message: wasCancelled
-      ? `Project ${project.projectNumber || ''}: \"${project.title}\" was reopened and assigned to staff`
-      : `Staff assigned to project ${project.projectNumber || ''}: \"${project.title}\"`,
-    project: project._id,
-  });
 
   return ProjectAssignment.find({
     project: project._id,
@@ -515,16 +471,6 @@ export const unassignStaff = async (id, staffId, user) => {
     action: ACTIVITY_ACTIONS.STAFF_UNASSIGNED,
     previousValue: { status: ASSIGNMENT_STATUS.ACTIVE },
     newValue: { status: ASSIGNMENT_STATUS.REMOVED },
-  });
-
-  const removedRecipients = await getRecipientsForProject(project, user, AUDIENCE.ADMIN_ONLY);
-  await notifyUsers({
-    recipients: [...removedRecipients, staffId],
-    actor: user,
-    type: 'STAFF_UNASSIGNED',
-    title: 'Staff Removed from Project',
-    message: `Staff was removed from project ${project.projectNumber || ''}: \"${project.title}\"`,
-    project: project._id,
   });
 
   return assignment;
@@ -590,8 +536,7 @@ export const submitWork = async (id, { note } = {}, user) => {
     metadata: { note: note || "" },
   });
 
-  // Submitted work goes to the admin only; the client sees it after admin approval.
-  const submitRecipients = await getRecipientsForProject(project, user, AUDIENCE.ADMIN_ONLY);
+  const submitRecipients = await getRecipientsForProject(project, user);
   await notifyUsers({
     recipients: submitRecipients,
     actor: user,
@@ -629,23 +574,13 @@ export const adminReview = async (
       newValue: { status: project.status },
     });
 
-    const clientRecipients = await getRecipientsForProject(project, user, AUDIENCE.CLIENT);
+    const clientRecipients = await getRecipientsForProject(project, user);
     await notifyUsers({
       recipients: clientRecipients,
       actor: user,
       type: 'WORK_APPROVED',
       title: 'Work Approved by Admin',
       message: `Work on project ${project.projectNumber || ''} was approved by Admin and is ready for client review`,
-      project: project._id,
-    });
-
-    const staffRecipients = await getRecipientsForProject(project, user, AUDIENCE.STAFF);
-    await notifyUsers({
-      recipients: staffRecipients,
-      actor: user,
-      type: 'WORK_APPROVED',
-      title: 'Your Work Was Approved',
-      message: `Admin approved your submitted work on project ${project.projectNumber || ''}`,
       project: project._id,
     });
 
@@ -706,17 +641,10 @@ export const createRevision = async (
     action: ACTIVITY_ACTIONS.REVISION_REQUESTED,
     previousValue: { status: previousStatus },
     newValue: { status: project.status, reason },
-    metadata: {
-      revisionId: String(revision._id),
-      instructions,
-      targetRole: computedTargetRole,
-    },
+    metadata: { revisionId: String(revision._id), instructions },
   });
 
-  // Client -> admin only. Admin -> only the party the revision is aimed at.
-  const revisionAudience =
-    computedTargetRole === ROLES.STAFF ? AUDIENCE.STAFF : AUDIENCE.CLIENT;
-  const revisionRecipients = await getRecipientsForProject(project, user, revisionAudience);
+  const revisionRecipients = await getRecipientsForProject(project, user);
   await notifyUsers({
     recipients: revisionRecipients,
     actor: user,
@@ -785,16 +713,6 @@ export const addClientFeedback = async (id, feedback, user) => {
     newValue: { feedback },
   });
 
-  const feedbackRecipients = await getRecipientsForProject(project, user, AUDIENCE.ADMIN_ONLY);
-  await notifyUsers({
-    recipients: feedbackRecipients,
-    actor: user,
-    type: 'CLIENT_FEEDBACK',
-    title: 'Client Feedback Received',
-    message: `${user.name} left feedback on project ${project.projectNumber || ''}`,
-    project: project._id,
-  });
-
   return project;
 };
 
@@ -815,16 +733,6 @@ export const cancelProject = async (id, reason, user) => {
     action: ACTIVITY_ACTIONS.PROJECT_CANCELLED,
     previousValue: { status: previousStatus },
     newValue: { status: project.status, reason: reason || "" },
-  });
-
-  const cancelRecipients = await getRecipientsForProject(project, user);
-  await notifyUsers({
-    recipients: cancelRecipients,
-    actor: user,
-    type: 'PROJECT_CANCELLED',
-    title: 'Project Cancelled',
-    message: `Project ${project.projectNumber || ''}: \"${project.title}\" was cancelled${reason ? `: ${reason}` : ''}`,
-    project: project._id,
   });
 
   return project;
