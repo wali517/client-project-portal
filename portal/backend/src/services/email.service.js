@@ -137,11 +137,6 @@ export const sendMail = async ({ to, subject, text, html }) => {
       subject,
       text,
       html,
-      headers: {
-        "X-Mailer": "CPM Portal",
-        "X-Auto-Response-Suppress": "All",
-        "Auto-Submitted": "auto-generated",
-      },
     });
     const accepted = info.accepted || [];
     if (!accepted.includes(recipient)) {
