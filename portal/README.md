@@ -21,20 +21,35 @@ projects, staff deliver the work, and every step is reviewed and recorded.
 
 ## 2. Setup
 
-```bash
-# 1. Backend
-cd backend
-cp .env.example .env          # then edit JWT_SECRET and MONGO_URI
-npm install
-npm run seed                  # creates demo accounts and sample data
-npm run dev                   # http://localhost:5000
+### Run locally (Windows PowerShell)
 
-# 2. Frontend (new terminal)
-cd frontend
-cp .env.example .env          # VITE_API_URL defaults to http://localhost:5000/api
+```powershell
+cd portal\backend
 npm install
-npm run dev                   # http://localhost:5173
+copy .env.example .env   # only if backend\.env does not exist yet
+notepad .env
+npm run seed
+npm run dev
 ```
+
+Open a second PowerShell window:
+
+```powershell
+cd portal\frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173. The frontend uses `frontend/.env.development` and talks to http://localhost:5000/api.
+
+If `vite` or `nodemon` is not recognized, run `npm install` in that folder. If it still fails, run `npm install --include=dev`.
+
+### Go live (Vercel)
+
+1. Test everything locally first.
+2. Backend project: set the live variables listed at the bottom of `backend/.env.example`, then deploy the `backend` folder.
+3. Frontend project: deploy the `frontend` folder. Its build uses `frontend/.env.production`, which points to the live backend.
+4. Open `<backend url>/api/health` and check it shows the build marker.
 
 ### Seeded demo accounts
 

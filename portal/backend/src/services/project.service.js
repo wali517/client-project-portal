@@ -31,8 +31,12 @@ import {
   REVISION_STATUS,
   ROLES,
 } from "../constants/index.js";
-import { notifyUsers, getRecipientsForProject } from "./notification.service.js";
-
+import {
+  notifyUsers,
+  getRecipientsForProject,
+  getAdminIds,
+  AUDIENCE,
+} from "./notification.service.js";
 
 const SORTABLE = [
   "createdAt",
@@ -183,13 +187,13 @@ export const createProject = async (payload, user) => {
     newValue: { projectNumber, title: project.title, status: project.status },
   });
 
-  const recipients = await getRecipientsForProject(project, user);
+  const recipients = await getRecipientsForProject(project, user, AUDIENCE.CLIENT);
   await notifyUsers({
     recipients,
     actor: user,
     type: 'PROJECT_CREATED',
     title: 'New Project Created',
-    message: `Project ${projectNumber}: "${project.title}" has been created`,
+    message: `Project ${projectNumber}: ${project.title} has been created`,
     project: project._id,
   });
 
@@ -244,13 +248,13 @@ export const createProjectFromRequest = async (
     },
   });
 
-  const recipients = await getRecipientsForProject(project, user);
+  const recipients = await getRecipientsForProject(project, user, AUDIENCE.CLIENT);
   await notifyUsers({
     recipients,
     actor: user,
     type: 'PROJECT_CREATED',
     title: 'New Project Created',
-    message: `Project ${projectNumber}: "${project.title}" has been created from request ${request.requestNumber || ''}`,
+    message: `Project ${projectNumber}: ${project.title} has been created from request ${request.requestNumber || ''}`,
     project: project._id,
   });
 
@@ -310,6 +314,16 @@ export const updateProject = async (id, payload, user) => {
     },
   });
 
+  const updateRecipients = await getRecipientsForProject(project, user);
+  await notifyUsers({
+    recipients: updateRecipients,
+    actor: user,
+    type: 'PROJECT_UPDATED',
+    title: 'Project Updated',
+    message: `Project ${project.projectNumber || ''}: ${project.title} details were updated by ${user.name}`,
+    project: project._id,
+  });
+
   return project;
 };
 
@@ -320,10 +334,17 @@ export const changeProjectStatus = async (id, status, user, metadata = {}) => {
   if (!allowedForRole.includes(status)) {
     throw ApiError.forbidden(`Your role cannot set a project to ${status}`);
   }
+  if (project.status === PROJECT_STATUS.CANCELLED && user.role !== ROLES.ADMIN) {
+    throw ApiError.forbidden('Only an admin can reopen a cancelled project');
+  }
   assertStatusTransition(project.status, status);
 
   const previousStatus = project.status;
   project.status = status;
+  if (previousStatus === PROJECT_STATUS.CANCELLED) {
+    project.cancelledAt = undefined;
+    project.cancellationReason = undefined;
+  }
   if (status === PROJECT_STATUS.UNDER_REVIEW) project.submittedAt = new Date();
   if (status === PROJECT_STATUS.IN_PROGRESS && project.progress === 0)
     project.progress = 5;
@@ -343,9 +364,9 @@ export const changeProjectStatus = async (id, status, user, metadata = {}) => {
   await notifyUsers({
     recipients: statusRecipients,
     actor: user,
-    type: 'PROJECT_STATUS_CHANGED',
-    title: 'Project Status Updated',
-    message: `Project ${project.projectNumber || ''} status changed to ${status.replace('_', ' ')}`,
+    type: previousStatus === PROJECT_STATUS.CANCELLED ? 'PROJECT_REOPENED' : 'PROJECT_STATUS_CHANGED',
+    title: previousStatus === PROJECT_STATUS.CANCELLED ? 'Project Reopened' : 'Project Status Updated',
+    message: `Project ${project.projectNumber || ''} status changed to ${status.replace(/_/g, ' ')}`,
     project: project._id,
   });
 
@@ -375,6 +396,16 @@ export const updateProgress = async (id, progress, user) => {
     action: ACTIVITY_ACTIONS.PROJECT_PROGRESS_UPDATED,
     previousValue: { progress: previous },
     newValue: { progress },
+  });
+
+  const progressRecipients = await getRecipientsForProject(project, user);
+  await notifyUsers({
+    recipients: progressRecipients,
+    actor: user,
+    type: 'PROJECT_PROGRESS_UPDATED',
+    title: 'Project Progress Updated',
+    message: `Project ${project.projectNumber || ''} progress changed from ${previous}% to ${progress}%`,
+    project: project._id,
   });
 
   return project;
@@ -418,16 +449,6 @@ export const assignStaff = async (id, staffIds, user) => {
     });
   }
 
-  const recipients = await getRecipientsForProject(project, user);
-  await notifyUsers({
-    recipients,
-    actor: user,
-    type: 'PROJECT_ASSIGNED',
-    title: 'Staff Assigned to Project',
-    message: `Staff assigned to project ${project.projectNumber || ''}: "${project.title}"`,
-    project: project._id,
-  });
-
   if (project.status === PROJECT_STATUS.NOT_STARTED) {
     const previousStatus = project.status;
     project.status = PROJECT_STATUS.ASSIGNED;
@@ -442,6 +463,18 @@ export const assignStaff = async (id, staffIds, user) => {
     });
   }
 
+  const assignRecipients = new Set([
+    ...(await getAdminIds()).map(String),
+    ...staffUsers.map((st) => String(st._id)),
+  ]);
+  await notifyUsers({
+    recipients: [...assignRecipients],
+    actor: user,
+    type: 'PROJECT_ASSIGNED',
+    title: 'Staff Assigned to Project',
+    message: `Staff assigned to project ${project.projectNumber || ''}: ${project.title}`,
+    project: project._id,
+  });
 
   return ProjectAssignment.find({
     project: project._id,
@@ -471,6 +504,16 @@ export const unassignStaff = async (id, staffId, user) => {
     action: ACTIVITY_ACTIONS.STAFF_UNASSIGNED,
     previousValue: { status: ASSIGNMENT_STATUS.ACTIVE },
     newValue: { status: ASSIGNMENT_STATUS.REMOVED },
+  });
+
+  const removedRecipients = await getRecipientsForProject(project, user, AUDIENCE.ADMIN_ONLY);
+  await notifyUsers({
+    recipients: [...removedRecipients, staffId],
+    actor: user,
+    type: 'STAFF_UNASSIGNED',
+    title: 'Staff Removed from Project',
+    message: `Staff was removed from project ${project.projectNumber || ''}: ${project.title}`,
+    project: project._id,
   });
 
   return assignment;
@@ -536,13 +579,13 @@ export const submitWork = async (id, { note } = {}, user) => {
     metadata: { note: note || "" },
   });
 
-  const submitRecipients = await getRecipientsForProject(project, user);
+  const submitRecipients = await getRecipientsForProject(project, user, AUDIENCE.ADMIN_ONLY);
   await notifyUsers({
     recipients: submitRecipients,
     actor: user,
     type: 'WORK_SUBMITTED',
     title: 'Work Submitted for Review',
-    message: `${user.name} submitted work for review on project ${project.projectNumber || ''}: "${project.title}"`,
+    message: `${user.name} submitted work for review on project ${project.projectNumber || ''}: ${project.title}`,
     project: project._id,
   });
 
@@ -574,13 +617,23 @@ export const adminReview = async (
       newValue: { status: project.status },
     });
 
-    const clientRecipients = await getRecipientsForProject(project, user);
+    const clientRecipients = await getRecipientsForProject(project, user, AUDIENCE.CLIENT);
     await notifyUsers({
       recipients: clientRecipients,
       actor: user,
       type: 'WORK_APPROVED',
       title: 'Work Approved by Admin',
       message: `Work on project ${project.projectNumber || ''} was approved by Admin and is ready for client review`,
+      project: project._id,
+    });
+
+    const staffRecipients = await getRecipientsForProject(project, user, AUDIENCE.STAFF);
+    await notifyUsers({
+      recipients: staffRecipients,
+      actor: user,
+      type: 'WORK_APPROVED',
+      title: 'Your Work Was Approved',
+      message: `Admin approved your submitted work on project ${project.projectNumber || ''}`,
       project: project._id,
     });
 
@@ -641,16 +694,22 @@ export const createRevision = async (
     action: ACTIVITY_ACTIONS.REVISION_REQUESTED,
     previousValue: { status: previousStatus },
     newValue: { status: project.status, reason },
-    metadata: { revisionId: String(revision._id), instructions },
+    metadata: {
+      revisionId: String(revision._id),
+      instructions,
+      targetRole: computedTargetRole,
+    },
   });
 
-  const revisionRecipients = await getRecipientsForProject(project, user);
+  const revisionAudience =
+    computedTargetRole === ROLES.STAFF ? AUDIENCE.STAFF : AUDIENCE.CLIENT;
+  const revisionRecipients = await getRecipientsForProject(project, user, revisionAudience);
   await notifyUsers({
     recipients: revisionRecipients,
     actor: user,
     type: 'REVISION_REQUESTED',
     title: 'Revision Requested',
-    message: `${user.name} requested a revision on project ${project.projectNumber || ''}: "${reason}"`,
+    message: `${user.name} requested a revision on project ${project.projectNumber || ''}: ${reason}`,
     project: project._id,
   });
 
@@ -691,7 +750,7 @@ export const clientApprove = async (id, { feedback } = {}, user) => {
     actor: user,
     type: 'PROJECT_COMPLETED',
     title: 'Project Completed & Approved',
-    message: `Client ${user.name} approved and completed project ${project.projectNumber || ''}: "${project.title}"`,
+    message: `Client ${user.name} approved and completed project ${project.projectNumber || ''}: ${project.title}`,
     project: project._id,
   });
 
@@ -711,6 +770,16 @@ export const addClientFeedback = async (id, feedback, user) => {
     action: ACTIVITY_ACTIONS.CLIENT_FEEDBACK,
     previousValue: { feedback: previous },
     newValue: { feedback },
+  });
+
+  const feedbackRecipients = await getRecipientsForProject(project, user, AUDIENCE.ADMIN_ONLY);
+  await notifyUsers({
+    recipients: feedbackRecipients,
+    actor: user,
+    type: 'CLIENT_FEEDBACK',
+    title: 'Client Feedback Received',
+    message: `${user.name} left feedback on project ${project.projectNumber || ''}`,
+    project: project._id,
   });
 
   return project;
@@ -733,6 +802,16 @@ export const cancelProject = async (id, reason, user) => {
     action: ACTIVITY_ACTIONS.PROJECT_CANCELLED,
     previousValue: { status: previousStatus },
     newValue: { status: project.status, reason: reason || "" },
+  });
+
+  const cancelRecipients = await getRecipientsForProject(project, user);
+  await notifyUsers({
+    recipients: cancelRecipients,
+    actor: user,
+    type: 'PROJECT_CANCELLED',
+    title: 'Project Cancelled',
+    message: `Project ${project.projectNumber || ''}: ${project.title} was cancelled${reason ? `: ${reason}` : ''}`,
+    project: project._id,
   });
 
   return project;

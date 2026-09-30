@@ -61,24 +61,32 @@ export const forgotPassword = asyncHandler(async (req, res) => {
 
   if (!user || !user.isActive) return genericResponse();
 
-  const rawToken = user.createPasswordResetToken(
-    env.passwordResetExpiresMin || 30,
-  );
+  const rawToken = user.createPasswordResetToken(env.passwordResetExpiresMin);
   await user.save({ validateBeforeSave: false });
 
-  const resetUrl = `${env.clientUrl}/reset-password?token=${rawToken}`;
+  const baseUrl = String(env.clientUrl).trim().replace(/\/+$/, "").replace(/\/api$/i, "");
+  const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
+
   const mailResult = await sendPasswordResetEmail({
     to: user.email,
     name: user.name,
     resetUrl,
   });
-  logger.info(
-    `Password reset link generated for ${user.email} (expires in 30 min): ${resetUrl}`,
-  );
 
-  const isDevOrFallback =
-    !env.isProduction || !env.smtp.host || !mailResult?.delivered;
-  return genericResponse(isDevOrFallback ? { resetUrl, token: rawToken } : {});
+  if (!mailResult?.delivered) {
+    logger.error(
+      `Password reset email for ${user.email} was NOT delivered: ${mailResult?.reason || 'unknown reason'}`,
+    );
+
+    if (!env.isProduction) {
+      return genericResponse({
+        emailDelivered: false,
+        emailError: mailResult?.reason || 'Email could not be sent',
+      });
+    }
+  }
+
+  return genericResponse();
 });
 
 export const resetPassword = asyncHandler(async (req, res) => {

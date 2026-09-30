@@ -7,10 +7,6 @@ import { ROLES, ASSIGNMENT_STATUS } from '../constants/index.js';
 import { parsePagination, buildPaginationMeta } from '../utils/pagination.js';
 import logger from '../utils/logger.js';
 
-/**
- * Dispatch notifications to a list of target recipient user IDs.
- * Automatically excludes the actor who triggered the event.
- */
 export const notifyUsers = async ({
   recipients = [],
   actor = null,
@@ -26,7 +22,6 @@ export const notifyUsers = async ({
     const actorId = String(actor?._id || actor || '');
     const recipientIds = Array.isArray(recipients) ? recipients : [recipients];
 
-    // Filter out valid IDs and exclude self-notifications
     const uniqueTargets = [
       ...new Set(
         recipientIds
@@ -56,46 +51,82 @@ export const notifyUsers = async ({
   }
 };
 
-export const getRecipientsForProject = async (project, senderUser, scope = 'PROJECT') => {
-  const recipients = [];
-  const senderId = String(senderUser?._id || senderUser || '');
+export const AUDIENCE = {
+  ADMIN_ONLY: 'ADMIN_ONLY',
+  CLIENT: 'CLIENT',
+  STAFF: 'STAFF',
+  ALL: 'ALL',
+};
 
-  let projDoc = project;
-  if (!projDoc || typeof projDoc === 'string' || !projDoc.client) {
-    const projId = typeof project === 'string' ? project : project?._id;
-    if (projId) {
-      projDoc = await Project.findById(projId).select('client');
-    }
-  }
-
-  const projectId = projDoc?._id || (typeof project === 'string' ? project : project?._id);
-
-  // 1. Always include active Admins
+export const getAdminIds = async () => {
   const admins = await User.find({ role: ROLES.ADMIN, isActive: true }).select('_id');
-  admins.forEach((admin) => recipients.push(admin._id));
+  return admins.map((a) => a._id);
+};
 
-  // 2. Include Client for project movements & client chats (exclude only for private STAFF_CHAT)
-  if (scope !== 'STAFF_CHAT' && projDoc && projDoc.client) {
-    const clientId = String(projDoc.client._id || projDoc.client);
-    recipients.push(clientId);
-  }
+export const getRecipientsForProject = async (project, senderUser, audience = AUDIENCE.ALL) => {
+  const senderId = String(senderUser?._id || senderUser || '');
+  const recipients = [...(await getAdminIds())];
 
-  // 3. Include Assigned Staff for project movements & staff chats (exclude only for private CLIENT_CHAT)
-  if (scope !== 'CLIENT_CHAT' && projectId) {
-    const assignments = await ProjectAssignment.find({
-      project: projectId,
-      status: ASSIGNMENT_STATUS.ACTIVE,
-    }).select('staff');
-    assignments.forEach((a) => recipients.push(a.staff));
+  const senderIsAdmin = senderUser?.role === ROLES.ADMIN;
+  const effectiveAudience = senderIsAdmin ? audience : AUDIENCE.ADMIN_ONLY;
+
+  if (effectiveAudience !== AUDIENCE.ADMIN_ONLY) {
+    let projDoc = project;
+    if (!projDoc || typeof projDoc === 'string' || !projDoc.client) {
+      const projId = typeof project === 'string' ? project : project?._id;
+      if (projId) projDoc = await Project.findById(projId).select('client');
+    }
+    const projectId = projDoc?._id || (typeof project === 'string' ? project : project?._id);
+
+    if (
+      (effectiveAudience === AUDIENCE.CLIENT || effectiveAudience === AUDIENCE.ALL) &&
+      projDoc?.client
+    ) {
+      recipients.push(String(projDoc.client._id || projDoc.client));
+    }
+
+    if ((effectiveAudience === AUDIENCE.STAFF || effectiveAudience === AUDIENCE.ALL) && projectId) {
+      const assignments = await ProjectAssignment.find({
+        project: projectId,
+        status: ASSIGNMENT_STATUS.ACTIVE,
+      }).select('staff');
+      assignments.forEach((a) => recipients.push(a.staff));
+    }
   }
 
   return [...new Set(recipients.map((r) => String(r)))].filter((r) => Boolean(r) && r !== senderId);
 };
 
-export const getUserNotifications = async (userId, query = {}) => {
+const STAFF_INTERNAL_TYPES = ['STAFF_ASSIGNED', 'STAFF_UNASSIGNED', 'PROJECT_ASSIGNED', 'WORK_SUBMITTED'];
+
+const buildVisibilityFilter = async (user) => {
+  const userId = user?._id || user;
+  const role = user?.role;
+  const filter = { recipient: userId };
+
+  if (role === ROLES.ADMIN) return filter;
+
+  const otherRole = role === ROLES.STAFF ? ROLES.CLIENT : ROLES.STAFF;
+  const otherIds = await User.find({ role: otherRole }).distinct('_id');
+  const otherChannel = role === ROLES.STAFF ? 'CLIENT' : 'STAFF';
+
+  const and = [
+
+    { $or: [{ actor: { $exists: false } }, { actor: null }, { actor: { $nin: otherIds } }] },
+
+    { $nor: [{ type: 'MESSAGE', channel: otherChannel }] },
+  ];
+
+  if (role === ROLES.CLIENT) and.push({ type: { $nin: STAFF_INTERNAL_TYPES } });
+
+  filter.$and = and;
+  return filter;
+};
+
+export const getUserNotifications = async (user, query = {}) => {
   const { page, limit, skip } = parsePagination({ ...query, limit: query.limit || 20 });
 
-  const filter = { recipient: userId };
+  const filter = await buildVisibilityFilter(user);
 
   const [items, total, unreadCount, unreadMessagesCount] = await Promise.all([
     Notification.find(filter)
@@ -107,8 +138,8 @@ export const getUserNotifications = async (userId, query = {}) => {
       .limit(limit)
       .lean(),
     Notification.countDocuments(filter),
-    Notification.countDocuments({ recipient: userId, isRead: false }),
-    Notification.countDocuments({ recipient: userId, isRead: false, type: 'MESSAGE' }),
+    Notification.countDocuments({ ...filter, isRead: false }),
+    Notification.countDocuments({ ...filter, isRead: false, type: 'MESSAGE' }),
   ]);
 
   return {
@@ -119,10 +150,11 @@ export const getUserNotifications = async (userId, query = {}) => {
   };
 };
 
-export const getUnreadCounts = async (userId) => {
+export const getUnreadCounts = async (user) => {
+  const filter = await buildVisibilityFilter(user);
   const [unreadCount, unreadMessagesCount] = await Promise.all([
-    Notification.countDocuments({ recipient: userId, isRead: false }),
-    Notification.countDocuments({ recipient: userId, isRead: false, type: 'MESSAGE' }),
+    Notification.countDocuments({ ...filter, isRead: false }),
+    Notification.countDocuments({ ...filter, isRead: false, type: 'MESSAGE' }),
   ]);
   return { unreadCount, unreadMessagesCount };
 };

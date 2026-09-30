@@ -110,13 +110,12 @@ export const createRequest = async (payload, user) => {
     actor: user,
     type: 'REQUEST_CREATED',
     title: 'New Request Submitted',
-    message: `New request ${requestNumber} submitted by ${user.name}: "${request.title}"`,
+    message: `New request ${requestNumber} submitted by ${user.name}: ${request.title}`,
     request: request._id,
   });
 
   return request;
 };
-
 
 export const updateRequest = async (id, payload, user) => {
   const request = await loadRequestForUser(id, user, { populate: false });
@@ -151,6 +150,16 @@ export const updateRequest = async (id, payload, user) => {
       deadline: request.deadline,
       budget: request.budget,
     },
+  });
+
+  const admins = await User.find({ role: ROLES.ADMIN, isActive: true }).select('_id');
+  await notifyUsers({
+    recipients: admins.map((a) => a._id),
+    actor: user,
+    type: 'REQUEST_UPDATED',
+    title: 'Request Updated',
+    message: `Request ${request.requestNumber || ''} ${request.title} was updated by ${user.name}`,
+    request: request._id,
   });
 
   return request;

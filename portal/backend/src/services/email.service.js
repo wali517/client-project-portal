@@ -1,71 +1,136 @@
 import nodemailer from 'nodemailer';
-import env from '../config/env.js';
+import env, { envFilePath, envFileFound } from '../config/env.js';
 import logger from '../utils/logger.js';
 
 let transporter = null;
 
-const getTransporter = async () => {
+const hasSmtp = () => Boolean(env.smtp.service || env.smtp.host);
+
+const clean = (value = '') => String(value).trim().replace(/^["']|["']$/g, '');
+const cleanPassword = (value = '') => clean(value).replace(/\s+/g, '');
+
+export const explainMailError = (error) => {
+  const code = error?.code || '';
+  const text = String(error?.message || error || '');
+  if (code === 'EAUTH' || /535|Invalid login|Username and Password not accepted|BadCredentials/i.test(text)) {
+    return 'SMTP login was rejected. For Gmail, SMTP_USER must be the full address and SMTP_PASSWORD must be a 16-character App Password (not your normal Gmail password). 2-Step Verification must be ON to create one.';
+  }
+  if (['ESOCKET', 'ECONNECTION', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND', 'EDNS'].includes(code)) {
+    return `Could not reach the mail server (${code}). Check SMTP_SERVICE / SMTP_HOST / SMTP_PORT and that your network or firewall allows outgoing mail.`;
+  }
+  if (/self.signed|certificate/i.test(text)) return 'The mail server certificate was rejected (TLS error).';
+  return text || 'Unknown mail error';
+};
+
+const PLACEHOLDER = /youraddress|your-address|example\.com|<.*>|app[ -]?password|your-16|xxxx/i;
+const hasPlaceholders = () =>
+  PLACEHOLDER.test(String(env.smtp.user)) || PLACEHOLDER.test(String(env.smtp.password));
+
+const notConfiguredReason = () =>
+  envFileFound
+    ? `SMTP settings are missing. Found ${envFilePath} but it has no active SMTP_SERVICE/SMTP_HOST, SMTP_USER and SMTP_PASSWORD lines (lines starting with # are ignored, and the file must be saved as ".env", not ".env.txt").`
+    : `No .env file exists at ${envFilePath}. Create it there (copy .env.example) and add the SMTP settings.`;
+
+const smtpSummary = () =>
+  env.smtp.service
+    ? `service=${env.smtp.service} user=${clean(env.smtp.user)}`
+    : `host=${clean(env.smtp.host)} port=${env.smtp.port} user=${clean(env.smtp.user) || '(none)'}`;
+
+const getTransporter = () => {
   if (transporter) return transporter;
-  if (env.smtp.service || env.smtp.host) {
-    const transportConfig = env.smtp.service
-      ? { service: env.smtp.service, auth: { user: env.smtp.user, pass: env.smtp.password } }
-      : {
-          host: env.smtp.host,
-          port: env.smtp.port,
-          secure: env.smtp.port === 465,
-          auth: env.smtp.user ? { user: env.smtp.user, pass: env.smtp.password } : undefined,
-          tls: { rejectUnauthorized: false },
-        };
-    transporter = nodemailer.createTransport(transportConfig);
-    return transporter;
+
+  if (!hasSmtp()) return null;
+
+  const timeouts = { connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 15000 };
+  const auth = env.smtp.user
+    ? { user: clean(env.smtp.user), pass: cleanPassword(env.smtp.password) }
+    : undefined;
+  const transportConfig = env.smtp.service
+    ? { service: clean(env.smtp.service), auth, ...timeouts }
+    : {
+        host: clean(env.smtp.host),
+        port: env.smtp.port,
+        secure: env.smtp.port === 465,
+        auth,
+        ...timeouts,
+      };
+  transporter = nodemailer.createTransport(transportConfig);
+  return transporter;
+};
+
+export const verifyEmailConfig = async () => {
+  if (!hasSmtp()) {
+    const reason = notConfiguredReason();
+    logger.error(`EMAIL NOT CONFIGURED - no emails (including password reset) can be delivered. ${reason}`);
+    return { ok: false, reason };
+  }
+  if (hasPlaceholders()) {
+    const reason =
+      'SMTP_USER / SMTP_PASSWORD still contain the example placeholder text. Replace them with your real Gmail address and 16-character App Password.';
+    logger.error(`[Email] ${reason}`);
+    return { ok: false, reason };
   }
   try {
-    const testAccount = await nodemailer.createTestAccount();
-    transporter = nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass,
-      },
-    });
-    logger.info(`[Email Service] Ethereal test mailer initialized for ${testAccount.user}`);
-    return transporter;
-  } catch (err) {
-    logger.warn(`Could not create Ethereal test account: ${err.message}`);
-    return null;
+    await getTransporter().verify();
+    logger.info(`[Email] SMTP login OK (${smtpSummary()}). Emails will be delivered.`);
+    return { ok: true };
+  } catch (error) {
+    const reason = explainMailError(error);
+    logger.error(`[Email] SMTP check FAILED (${smtpSummary()}): ${reason}`);
+    return { ok: false, reason };
   }
 };
 
 export const sendMail = async ({ to, subject, text, html }) => {
-  const mailer = await getTransporter();
-  const fromAddress = env.smtp.from || 'CPM Portal <no-reply@portal.test>';
+  const mailer = getTransporter();
 
   if (!mailer) {
-    logger.info(`[Email Service - Console Fallback]\nTo: ${to}\nSubject: ${subject}\nBody:\n${text}`);
-    return { delivered: false, reason: 'No mail transporter available' };
+    const reason = notConfiguredReason();
+    logger.error(`[Email] NOT sent to ${to}: ${reason}`);
+    return { delivered: false, reason };
   }
+
+  if (hasPlaceholders()) {
+    const reason =
+      'SMTP_USER / SMTP_PASSWORD still contain the example placeholder text. Replace them with your real Gmail address and 16-character App Password.';
+    logger.error(`[Email] NOT sent to ${to}: ${reason}`);
+    return { delivered: false, reason };
+  }
+
+  const fromAddress = clean(env.smtp.from) || clean(env.smtp.user);
   try {
     const info = await mailer.sendMail({ from: fromAddress, to, subject, text, html });
-    const previewUrl = nodemailer.getTestMessageUrl(info);
-    if (previewUrl) {
-      logger.info(`[Ethereal Mailbox Delivered] To: ${to} | Preview URL: ${previewUrl}`);
-    } else {
-      logger.info(`Email sent via SMTP to ${to}: ${info.messageId || 'OK'}`);
+    const accepted = info.accepted || [];
+    if (!accepted.length) {
+      const reason = `Mail server did not accept the recipient: ${(info.rejected || []).join(', ') || to}`;
+      logger.error(`[Email] NOT delivered to ${to}: ${reason}`);
+      return { delivered: false, reason };
     }
-    return { delivered: true, info, previewUrl };
+    logger.info(`[Email] Sent to ${to} (${info.messageId || 'OK'}). Response: ${info.response || ''}`);
+    return { delivered: true, info };
   } catch (error) {
-    logger.error(`Failed to send email to ${to}: ${error.message}`);
-    logger.info(`[Email Service - Console Fallback on Error]\nTo: ${to}\nSubject: ${subject}\nBody:\n${text}`);
-    return { delivered: false, error: error.message };
+
+    transporter = null;
+    const reason = explainMailError(error);
+    logger.error(`[Email] FAILED to send to ${to}: ${reason}`);
+    return { delivered: false, reason, error: error.message };
   }
 };
+
+const escapeHtml = (value = '') =>
+  String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 export const sendPasswordResetEmail = async ({ to, name, resetUrl }) =>
   sendMail({
     to,
     subject: 'Reset your portal password',
-    text: `Hi ${name},\n\nUse this link to set a new password (valid for ${env.passwordResetExpiresMin} minutes):\n${resetUrl}\n\nIf you did not ask for this, you can ignore this email.`,
-    html: `<p>Hi ${name},</p><p>Use this link to set a new password (valid for ${env.passwordResetExpiresMin} minutes):</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>If you did not ask for this, you can ignore this email.</p>`,
+    text: `Hi ${name},\n\nWe received a request to reset your password. Open this link to choose a new one (valid for ${env.passwordResetExpiresMin} minutes):\n${resetUrl}\n\nIf you did not ask for this, you can ignore this email.`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#1f2937">
+        <p>Hi ${escapeHtml(name)},</p>
+        <p>We received a request to reset your password. Click the button below to choose a new one. The link is valid for ${env.passwordResetExpiresMin} minutes.</p>
+        <p style="margin:24px 0"><a href="${resetUrl}" style="background:#4f46e5;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">Reset password</a></p>
+        <p style="font-size:12px;color:#6b7280">Or paste this link into your browser:<br>${resetUrl}</p>
+        <p style="font-size:12px;color:#6b7280">If you did not ask for this, you can ignore this email.</p>
+      </div>`,
   });

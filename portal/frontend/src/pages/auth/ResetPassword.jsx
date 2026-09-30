@@ -33,20 +33,33 @@ const ResetPassword = () => {
     }
   };
 
+  if (!tokenFromUrl) {
+    return (
+      <div className="text-center space-y-4">
+        <h1 className="text-xl font-semibold text-ink-900">Reset link required</h1>
+        <p className="text-sm text-ink-500">
+          Passwords can only be reset from the link we email you. Request a reset link and open it from your
+          inbox.
+        </p>
+        <Link
+          to="/forgot-password"
+          className="inline-flex w-full items-center justify-center rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700"
+        >
+          Send me a reset link
+        </Link>
+        <Link to="/login" className="block text-sm text-brand-600 hover:underline">
+          Back to sign in
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-semibold text-ink-900">Choose a new password</h1>
       <p className="mt-1 text-sm text-ink-500">At least 8 characters, with an uppercase letter, a number and a symbol.</p>
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4" noValidate>
-        {!tokenFromUrl && (
-          <Input
-            label="Reset token"
-            required
-            error={errors.token?.message}
-            {...register('token', { required: 'Paste the token from your email' })}
-          />
-        )}
         <Input
           label="New password"
           type="password"

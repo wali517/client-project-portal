@@ -1,11 +1,14 @@
 import dotenv from "dotenv";
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-
-dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const backendRoot = path.resolve(__dirname, "../../");
+
+export const envFilePath = path.join(backendRoot, ".env");
+export const envFileFound = fs.existsSync(envFilePath);
+dotenv.config({ path: envFilePath });
 
 const toInt = (value, fallback) => {
   const parsed = Number.parseInt(value ?? "", 10);

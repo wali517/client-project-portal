@@ -10,8 +10,8 @@ import { getErrorMessage } from '../../utils/errors.js';
 const ForgotPassword = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSent, setIsSent] = useState(false);
-  const [resetData, setResetData] = useState(null);
   const [error, setError] = useState(null);
+  const [mailProblem, setMailProblem] = useState(null);
   const {
     register,
     handleSubmit,
@@ -23,8 +23,9 @@ const ForgotPassword = () => {
     setError(null);
     try {
       const response = await forgotPassword(values);
-      if (response?.data?.token || response?.data?.resetUrl) {
-        setResetData(response.data);
+
+      if (response?.data?.emailDelivered === false) {
+        setMailProblem(response.data.emailError || 'The email could not be sent.');
       }
       setIsSent(true);
     } catch (err) {
@@ -33,6 +34,39 @@ const ForgotPassword = () => {
       setIsSubmitting(false);
     }
   };
+
+  if (isSent && mailProblem) {
+    return (
+      <div className="space-y-4 text-center">
+        <h1 className="text-xl font-semibold text-ink-900">Email could not be sent</h1>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-left space-y-2">
+          <p className="text-xs font-semibold text-amber-900">Developer note (only shown in local development)</p>
+          <p className="text-xs text-amber-800 break-words">{mailProblem}</p>
+          <ol className="list-decimal space-y-1 pl-4 text-xs text-amber-800">
+            <li>
+              Open <code>backend/.env</code> and add your real Gmail address and App Password on the{' '}
+              <code>SMTP_</code> lines (no <code>#</code> at the start).
+            </li>
+            <li>Stop the backend and start it again.</li>
+            <li>
+              Run <code>npm run test:email -- your-address@gmail.com</code> in the backend folder to confirm.
+            </li>
+            <li>Come back here and try again.</li>
+          </ol>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setIsSent(false);
+            setMailProblem(null);
+          }}
+          className="text-sm text-brand-600 hover:underline"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   if (isSent) {
     return (
@@ -45,18 +79,10 @@ const ForgotPassword = () => {
           If that email belongs to an account, a reset link is on its way to your mailbox. The link expires in 30 minutes.
         </p>
 
-        {resetData?.token && (
-          <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-4 text-left space-y-2">
-            <p className="text-xs font-semibold text-brand-900">Direct Reset Link (Dev / Local Mode):</p>
-            <p className="text-xs text-brand-700 break-all">{resetData.resetUrl || `/reset-password?token=${resetData.token}`}</p>
-            <Link
-              to={`/reset-password?token=${resetData.token}`}
-              className="mt-2 inline-flex w-full items-center justify-center rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-brand-700"
-            >
-              Reset Password Now
-            </Link>
-          </div>
-        )}
+        <p className="text-xs text-ink-400">
+          Open the email and click the link inside it to choose a new password. Check your spam folder if you
+          cannot find it.
+        </p>
 
         <div>
           <Link to="/login" className="inline-block text-sm text-brand-600 hover:underline">

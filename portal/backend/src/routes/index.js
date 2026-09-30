@@ -10,7 +10,7 @@ import notificationRoutes from './notification.routes.js';
 
 const router = Router();
 
-router.get('/health', (_req, res) => res.json({ success: true, message: 'API is running', data: { uptime: process.uptime() } }));
+router.get('/health', (_req, res) => res.json({ success: true, message: 'API is running', data: { uptime: process.uptime(), build: 'cancelled-reopen-v1' } }));
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/requests', requestRoutes);

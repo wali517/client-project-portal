@@ -43,6 +43,33 @@ const isProjectMovementType = (type = '') => {
   return true;
 };
 
+const VISIBLE_POLL_MS = 2000;
+const HIDDEN_POLL_MS = 10000;
+
+const STAFF_ONLY_TYPES = ['STAFF_ASSIGNED', 'STAFF_UNASSIGNED', 'PROJECT_ASSIGNED', 'WORK_SUBMITTED'];
+
+const isVisibleToViewer = (item, viewerRole) => {
+  if (viewerRole === ROLES.ADMIN) return true;
+  const otherRole = viewerRole === ROLES.STAFF ? ROLES.CLIENT : ROLES.STAFF;
+  if (item.actor?.role === otherRole) return false;
+  if (String(item.type).toUpperCase() === 'MESSAGE' && item.channel === otherRole) return false;
+  if (viewerRole === ROLES.CLIENT && STAFF_ONLY_TYPES.includes(String(item.type).toUpperCase())) return false;
+  return true;
+};
+
+const presentForViewer = (item, viewerRole) => {
+  if (viewerRole === ROLES.ADMIN) {
+    const who = item.actor?.name;
+    const role = item.actor?.role ? humanize(item.actor.role) : '';
+    return { ...item, fromLabel: who ? `${role ? `${role}: ` : ''}${who}` : 'System' };
+  }
+  return {
+    ...item,
+    actor: { name: 'Admin', role: ROLES.ADMIN },
+    fromLabel: 'From Admin',
+  };
+};
+
 export const NotificationProvider = ({ children }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -105,13 +132,12 @@ export const NotificationProvider = ({ children }) => {
         }
       }
 
-      // If backend notification endpoint returned 404, fallback to /dashboard activity logs
       if (isEndpointMissingRef.current) {
         try {
           const dashRes = await getDashboard();
           const activityList = dashRes?.data?.activity || [];
           rawItems = activityList.map((act) => {
-            const actorName = act.user?.name || 'Someone';
+            const actorName = user.role === ROLES.ADMIN ? act.user?.name || 'Someone' : 'Admin';
             const actionText = ACTIVITY_LABELS[act.action] || humanize(act.action);
             const title = `${actorName} ${actionText}`;
             const changeText = describeChange(act);
@@ -138,17 +164,17 @@ export const NotificationProvider = ({ children }) => {
         }
       }
 
-      // 1. Filter ONLY for project & request movements (No login/logout logs)
-      const projectOnlyItems = rawItems.filter((item) => isProjectMovementType(item.type));
+      const projectOnlyItems = rawItems
+        .filter((item) => isProjectMovementType(item.type))
+        .filter((item) => isVisibleToViewer(item, user.role))
+        .map((item) => presentForViewer(item, user.role));
 
-      // 2. Active notifications are unseen/unread items
       const unreadItems = projectOnlyItems.filter((item) => !item.isRead);
       const unread = unreadItems.length;
       const unreadMsgCount = unreadItems.filter((i) =>
         String(i.type).toUpperCase().includes('MESSAGE')
       ).length;
 
-      // 3. Stability check: Only update state if notification list signature has actually changed
       const currentSignature = unreadItems.map((i) => String(i._id || i.id)).join(',');
       if (lastSignatureRef.current !== currentSignature) {
         lastSignatureRef.current = currentSignature;
@@ -164,7 +190,6 @@ export const NotificationProvider = ({ children }) => {
         return;
       }
 
-      // Toast alerts for newly arrived unseen notifications
       unreadItems.forEach((n) => {
         const id = String(n._id || n.id);
         if (!knownIdsRef.current.has(id)) {
@@ -194,7 +219,7 @@ export const NotificationProvider = ({ children }) => {
             ),
             {
               icon,
-              duration: 5000,
+              duration: 1000,
               id: `notif-${id}`,
             }
           );
@@ -221,17 +246,40 @@ export const NotificationProvider = ({ children }) => {
     setIsLoading(true);
     fetchLatest().finally(() => setIsLoading(false));
 
-    const interval = setInterval(async () => {
-      if (document.hidden || isPollingRef.current || isRateLimitedRef.current) return;
-      isPollingRef.current = true;
-      try {
-        await fetchLatest();
-      } finally {
-        isPollingRef.current = false;
-      }
-    }, 2000);
+    let timer = null;
+    let stopped = false;
 
-    return () => clearInterval(interval);
+    const poll = async () => {
+      if (stopped) return;
+      if (!isPollingRef.current && !isRateLimitedRef.current) {
+        isPollingRef.current = true;
+        try {
+          await fetchLatest();
+        } finally {
+          isPollingRef.current = false;
+        }
+      }
+      if (!stopped) timer = setTimeout(poll, document.hidden ? HIDDEN_POLL_MS : VISIBLE_POLL_MS);
+    };
+
+    const pollNow = () => {
+      if (document.hidden) return;
+      clearTimeout(timer);
+      poll();
+    };
+
+    timer = setTimeout(poll, VISIBLE_POLL_MS);
+    document.addEventListener('visibilitychange', pollNow);
+    window.addEventListener('focus', pollNow);
+    window.addEventListener('online', pollNow);
+
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', pollNow);
+      window.removeEventListener('focus', pollNow);
+      window.removeEventListener('online', pollNow);
+    };
   }, [user, fetchLatest]);
 
   const markAsRead = useCallback(async (id) => {
@@ -240,9 +288,9 @@ export const NotificationProvider = ({ children }) => {
         await markNotificationRead(id);
       }
     } catch {
-      // ignore network error
+
     } finally {
-      // Instantly clear/remove the notification from the list once seen
+
       setNotifications((prev) => prev.filter((item) => String(item._id || item.id) !== String(id)));
       setUnreadCount((prev) => Math.max(0, prev - 1));
       lastSignatureRef.current = '';
@@ -255,7 +303,7 @@ export const NotificationProvider = ({ children }) => {
         await markAllNotificationsRead();
       }
     } catch {
-      // ignore network error
+
     } finally {
       setNotifications([]);
       setUnreadCount(0);

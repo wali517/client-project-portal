@@ -4,20 +4,19 @@ import Select from '../ui/Select.jsx';
 import Input from '../ui/Input.jsx';
 import Button from '../ui/Button.jsx';
 import { updateProjectStatus } from '../../api/projectApi.js';
-import { PROJECT_STATUS_BY_ROLE, PROJECT_STATUS_LABELS } from '../../constants/index.js';
+import { PROJECT_STATUS_BY_ROLE, PROJECT_STATUS_FLOW, PROJECT_STATUS_LABELS } from '../../constants/index.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
-/**
- * Offers the statuses this role may set. The API validates the transition
- * itself, so an invalid pick is rejected server side rather than silently applied.
- */
 const StatusChanger = ({ project, role, onUpdated }) => {
   const [status, setStatus] = useState('');
   const [note, setNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const options = (PROJECT_STATUS_BY_ROLE[role] || [])
+  const canReopen = project.status !== 'CANCELLED' || role === 'ADMIN';
+
+  const options = (canReopen ? PROJECT_STATUS_BY_ROLE[role] || [] : [])
     .filter((value) => value !== project.status)
+    .filter((value) => (PROJECT_STATUS_FLOW[project.status] || []).includes(value))
     .map((value) => ({ value, label: PROJECT_STATUS_LABELS[value] }));
 
   if (!options.length) return null;
@@ -27,7 +26,7 @@ const StatusChanger = ({ project, role, onUpdated }) => {
     setIsSaving(true);
     try {
       const response = await updateProjectStatus(project._id, { status, note: note || undefined });
-      toast.success('Status updated');
+      toast.success(project.status === 'CANCELLED' ? 'Project reopened and status updated' : 'Status updated');
       setStatus('');
       setNote('');
       onUpdated?.(response.data);

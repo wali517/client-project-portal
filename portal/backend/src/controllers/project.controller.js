@@ -2,7 +2,10 @@ import asyncHandler from "../utils/asyncHandler.js";
 import { sendSuccess } from "../utils/apiResponse.js";
 import * as projectService from "../services/project.service.js";
 import * as messageService from "../services/message.service.js";
-import { listActivity } from "../services/activity.service.js";
+import {
+  listActivity,
+  buildActivityVisibility,
+} from "../services/activity.service.js";
 import { loadProjectForUser } from "../services/access.service.js";
 import { parsePagination, buildPaginationMeta } from "../utils/pagination.js";
 
@@ -174,7 +177,7 @@ export const getProjectActivity = asyncHandler(async (req, res) => {
   });
   const { page, limit, skip } = parsePagination(req.query);
   const { items, total } = await listActivity({
-    filter: { project: project._id },
+    filter: { project: project._id, ...buildActivityVisibility(req.user) },
     page,
     limit,
     skip,

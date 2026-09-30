@@ -89,6 +89,7 @@ const NotificationBox = ({ className = '' }) => {
                       </div>
 
                       <p className="text-xs text-ink-600 line-clamp-2 leading-relaxed">{n.message}</p>
+                      {n.fromLabel && <p className="text-[10px] font-medium text-brand-600">{n.fromLabel}</p>}
                     </div>
                   </Link>
                 );

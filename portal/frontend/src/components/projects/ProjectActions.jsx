@@ -19,12 +19,8 @@ import { canAdminReview, canClientReview, canSubmitWork, isAdmin, isClient } fro
 import { PROJECT_STATUS } from '../../constants/index.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
-/**
- * The workflow buttons for whichever role is looking at the project.
- * Everything here is re-checked by the API before it takes effect.
- */
 const ProjectActions = ({ project, user, onChanged, onDeleted }) => {
-  const [dialog, setDialog] = useState(null); // submit | revision | feedback | approve | cancel | delete
+  const [dialog, setDialog] = useState(null);
   const [text, setText] = useState('');
   const [extra, setExtra] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -278,7 +274,7 @@ const ProjectActions = ({ project, user, onChanged, onDeleted }) => {
         isOpen={dialog === 'cancel'}
         onClose={close}
         title="Cancel this project?"
-        description="Cancelling stops all work. This cannot be undone."
+        description="Cancelling stops all work. An admin can reopen it later by changing its status."
         footer={
           <>
             <Button variant="secondary" onClick={close} disabled={isSaving}>
