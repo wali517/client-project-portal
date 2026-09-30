@@ -86,34 +86,66 @@ export const sendMail = async ({ to, subject, text, html }) => {
 
   if (!mailer) {
     const reason = notConfiguredReason();
-    logger.error(`[Email] NOT sent to ${to}: ${reason}`);
+    logger.error(`[Email] NOT sent: ${reason}`);
     return { delivered: false, reason };
   }
 
   if (hasPlaceholders()) {
     const reason =
-      'SMTP_USER / SMTP_PASSWORD still contain the example placeholder text. Replace them with your real Gmail address and 16-character App Password.';
-    logger.error(`[Email] NOT sent to ${to}: ${reason}`);
+      'SMTP_USER / SMTP_PASSWORD still contain placeholder text.';
+    logger.error(`[Email] NOT sent: ${reason}`);
     return { delivered: false, reason };
   }
 
-  const fromAddress = clean(env.smtp.from) || clean(env.smtp.user);
+  const recipient = clean(to);
+  const sender = clean(env.smtp.from) || clean(env.smtp.user);
+
+  if (!recipient) {
+    const reason = 'Recipient email address is empty.';
+    logger.error(`[Email] NOT sent: ${reason}`);
+    return { delivered: false, reason };
+  }
+
   try {
-    const info = await mailer.sendMail({ from: fromAddress, to, subject, text, html });
+    const info = await mailer.sendMail({
+      from: sender,
+      to: recipient,
+      replyTo: sender,
+      subject,
+      text,
+      html,
+    });
+
     const accepted = info.accepted || [];
-    if (!accepted.length) {
-      const reason = `Mail server did not accept the recipient: ${(info.rejected || []).join(', ') || to}`;
-      logger.error(`[Email] NOT delivered to ${to}: ${reason}`);
+
+    if (!accepted.includes(recipient)) {
+      const reason = `Mail server did not accept recipient: ${recipient}`;
+      logger.error(`[Email] NOT delivered: ${reason}`);
       return { delivered: false, reason };
     }
-    logger.info(`[Email] Sent to ${to} (${info.messageId || 'OK'}). Response: ${info.response || ''}`);
-    return { delivered: true, info };
-  } catch (error) {
 
+    logger.info(
+      `[Email] Accepted by SMTP for recipient ${recipient}. MessageId=${info.messageId || 'OK'}`
+    );
+
+    return {
+      delivered: true,
+      info,
+    };
+  } catch (error) {
     transporter = null;
+
     const reason = explainMailError(error);
-    logger.error(`[Email] FAILED to send to ${to}: ${reason}`);
-    return { delivered: false, reason, error: error.message };
+
+    logger.error(
+      `[Email] FAILED for recipient ${recipient}: ${reason}`
+    );
+
+    return {
+      delivered: false,
+      reason,
+      error: error.message,
+    };
   }
 };
 
