@@ -51,6 +51,9 @@ export const me = asyncHandler(async (req, res) =>
 
 export const forgotPassword = asyncHandler(async (req, res) => {
   const email = req.body.email?.toLowerCase()?.trim();
+
+  logger.info(`[Password Reset] Request received for ${email}`);
+
   const user = await User.findOne({ email });
 
   const genericResponse = (extraData = {}) =>
@@ -59,13 +62,40 @@ export const forgotPassword = asyncHandler(async (req, res) => {
       data: extraData,
     });
 
-  if (!user || !user.isActive) return genericResponse();
+  if (!user) {
+    logger.warn(`[Password Reset] No user found for ${email}`);
+    return genericResponse();
+  }
 
-  const rawToken = user.createPasswordResetToken(env.passwordResetExpiresMin);
+  logger.info(
+    `[Password Reset] User found: role=${user.role}, isActive=${user.isActive}`,
+  );
+
+  if (!user.isActive) {
+    logger.warn(
+      `[Password Reset] Account is deactivated: role=${user.role}`,
+    );
+    return genericResponse();
+  }
+
+  const rawToken = user.createPasswordResetToken(
+    env.passwordResetExpiresMin,
+  );
+
   await user.save({ validateBeforeSave: false });
 
-  const baseUrl = String(env.clientUrl).trim().replace(/\/+$/, "").replace(/\/api$/i, "");
+  logger.info(
+    `[Password Reset] Reset token created for active ${user.role} account`,
+  );
+
+  const baseUrl = String(env.clientUrl)
+    .trim()
+    .replace(/\/+$/, "")
+    .replace(/\/api$/i, "");
+
   const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
+
+  logger.info(`[Password Reset] Sending reset email to ${user.email}`);
 
   const mailResult = await sendPasswordResetEmail({
     to: user.email,
@@ -75,15 +105,21 @@ export const forgotPassword = asyncHandler(async (req, res) => {
 
   if (!mailResult?.delivered) {
     logger.error(
-      `Password reset email for ${user.email} was NOT delivered: ${mailResult?.reason || 'unknown reason'}`,
+      `[Password Reset] Email NOT delivered to ${user.email}: ${
+        mailResult?.reason || "unknown reason"
+      }`,
     );
 
     if (!env.isProduction) {
       return genericResponse({
         emailDelivered: false,
-        emailError: mailResult?.reason || 'Email could not be sent',
+        emailError: mailResult?.reason || "Email could not be sent",
       });
     }
+  } else {
+    logger.info(
+      `[Password Reset] Email successfully delivered to ${user.email}`,
+    );
   }
 
   return genericResponse();
