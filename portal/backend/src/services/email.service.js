@@ -131,12 +131,17 @@ export const sendMail = async ({ to, subject, text, html }) => {
   }
   try {
     const info = await mailer.sendMail({
-      from: sender,
+      from: `"CPM Portal" <${sender}>`,
       to: recipient,
       replyTo: sender,
       subject,
       text,
       html,
+      headers: {
+        "X-Mailer": "CPM Portal",
+        "X-Auto-Response-Suppress": "All",
+        "Auto-Submitted": "auto-generated",
+      },
     });
     const accepted = info.accepted || [];
     if (!accepted.includes(recipient)) {
