@@ -1,30 +1,50 @@
-import nodemailer from 'nodemailer';
-import env, { envFilePath, envFileFound } from '../config/env.js';
-import logger from '../utils/logger.js';
+import nodemailer from "nodemailer";
+import env, { envFilePath, envFileFound } from "../config/env.js";
+import logger from "../utils/logger.js";
 
 let transporter = null;
 
 const hasSmtp = () => Boolean(env.smtp.service || env.smtp.host);
 
-const clean = (value = '') => String(value).trim().replace(/^["']|["']$/g, '');
-const cleanPassword = (value = '') => clean(value).replace(/\s+/g, '');
+const clean = (value = "") =>
+  String(value)
+    .trim()
+    .replace(/^["']|["']$/g, "");
+const cleanPassword = (value = "") => clean(value).replace(/\s+/g, "");
 
 export const explainMailError = (error) => {
-  const code = error?.code || '';
-  const text = String(error?.message || error || '');
-  if (code === 'EAUTH' || /535|Invalid login|Username and Password not accepted|BadCredentials/i.test(text)) {
-    return 'SMTP login was rejected. For Gmail, SMTP_USER must be the full address and SMTP_PASSWORD must be a 16-character App Password (not your normal Gmail password). 2-Step Verification must be ON to create one.';
+  const code = error?.code || "";
+  const text = String(error?.message || error || "");
+  if (
+    code === "EAUTH" ||
+    /535|Invalid login|Username and Password not accepted|BadCredentials/i.test(
+      text,
+    )
+  ) {
+    return "SMTP login was rejected. For Gmail, SMTP_USER must be the full address and SMTP_PASSWORD must be a 16-character App Password (not your normal Gmail password). 2-Step Verification must be ON to create one.";
   }
-  if (['ESOCKET', 'ECONNECTION', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND', 'EDNS'].includes(code)) {
+  if (
+    [
+      "ESOCKET",
+      "ECONNECTION",
+      "ETIMEDOUT",
+      "ECONNREFUSED",
+      "ENOTFOUND",
+      "EDNS",
+    ].includes(code)
+  ) {
     return `Could not reach the mail server (${code}). Check SMTP_SERVICE / SMTP_HOST / SMTP_PORT and that your network or firewall allows outgoing mail.`;
   }
-  if (/self.signed|certificate/i.test(text)) return 'The mail server certificate was rejected (TLS error).';
-  return text || 'Unknown mail error';
+  if (/self.signed|certificate/i.test(text))
+    return "The mail server certificate was rejected (TLS error).";
+  return text || "Unknown mail error";
 };
 
-const PLACEHOLDER = /youraddress|your-address|example\.com|<.*>|app[ -]?password|your-16|xxxx/i;
+const PLACEHOLDER =
+  /youraddress|your-address|example\.com|<.*>|app[ -]?password|your-16|xxxx/i;
 const hasPlaceholders = () =>
-  PLACEHOLDER.test(String(env.smtp.user)) || PLACEHOLDER.test(String(env.smtp.password));
+  PLACEHOLDER.test(String(env.smtp.user)) ||
+  PLACEHOLDER.test(String(env.smtp.password));
 
 const notConfiguredReason = () =>
   envFileFound
@@ -34,14 +54,18 @@ const notConfiguredReason = () =>
 const smtpSummary = () =>
   env.smtp.service
     ? `service=${env.smtp.service} user=${clean(env.smtp.user)}`
-    : `host=${clean(env.smtp.host)} port=${env.smtp.port} user=${clean(env.smtp.user) || '(none)'}`;
+    : `host=${clean(env.smtp.host)} port=${env.smtp.port} user=${clean(env.smtp.user) || "(none)"}`;
 
 const getTransporter = () => {
   if (transporter) return transporter;
 
   if (!hasSmtp()) return null;
 
-  const timeouts = { connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 15000 };
+  const timeouts = {
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+  };
   const auth = env.smtp.user
     ? { user: clean(env.smtp.user), pass: cleanPassword(env.smtp.password) }
     : undefined;
@@ -61,18 +85,22 @@ const getTransporter = () => {
 export const verifyEmailConfig = async () => {
   if (!hasSmtp()) {
     const reason = notConfiguredReason();
-    logger.error(`EMAIL NOT CONFIGURED - no emails (including password reset) can be delivered. ${reason}`);
+    logger.error(
+      `EMAIL NOT CONFIGURED - no emails (including password reset) can be delivered. ${reason}`,
+    );
     return { ok: false, reason };
   }
   if (hasPlaceholders()) {
     const reason =
-      'SMTP_USER / SMTP_PASSWORD still contain the example placeholder text. Replace them with your real Gmail address and 16-character App Password.';
+      "SMTP_USER / SMTP_PASSWORD still contain the example placeholder text. Replace them with your real Gmail address and 16-character App Password.";
     logger.error(`[Email] ${reason}`);
     return { ok: false, reason };
   }
   try {
     await getTransporter().verify();
-    logger.info(`[Email] SMTP login OK (${smtpSummary()}). Emails will be delivered.`);
+    logger.info(
+      `[Email] SMTP login OK (${smtpSummary()}). Emails will be delivered.`,
+    );
     return { ok: true };
   } catch (error) {
     const reason = explainMailError(error);
@@ -89,23 +117,18 @@ export const sendMail = async ({ to, subject, text, html }) => {
     logger.error(`[Email] NOT sent: ${reason}`);
     return { delivered: false, reason };
   }
-
   if (hasPlaceholders()) {
-    const reason =
-      'SMTP_USER / SMTP_PASSWORD still contain placeholder text.';
+    const reason = "SMTP_USER / SMTP_PASSWORD still contain placeholder text.";
     logger.error(`[Email] NOT sent: ${reason}`);
     return { delivered: false, reason };
   }
-
   const recipient = clean(to);
   const sender = clean(env.smtp.from) || clean(env.smtp.user);
-
   if (!recipient) {
-    const reason = 'Recipient email address is empty.';
+    const reason = "Recipient email address is empty.";
     logger.error(`[Email] NOT sent: ${reason}`);
     return { delivered: false, reason };
   }
-
   try {
     const info = await mailer.sendMail({
       from: sender,
@@ -115,47 +138,37 @@ export const sendMail = async ({ to, subject, text, html }) => {
       text,
       html,
     });
-
     const accepted = info.accepted || [];
-
     if (!accepted.includes(recipient)) {
       const reason = `Mail server did not accept recipient: ${recipient}`;
       logger.error(`[Email] NOT delivered: ${reason}`);
       return { delivered: false, reason };
     }
-
     logger.info(
-      `[Email] Accepted by SMTP for recipient ${recipient}. MessageId=${info.messageId || 'OK'}`
+      `[Email] Accepted by SMTP for recipient ${recipient}. MessageId=${info.messageId || "OK"}`,
     );
-
-    return {
-      delivered: true,
-      info,
-    };
+    return { delivered: true, info };
   } catch (error) {
     transporter = null;
-
     const reason = explainMailError(error);
-
-    logger.error(
-      `[Email] FAILED for recipient ${recipient}: ${reason}`
-    );
-
-    return {
-      delivered: false,
-      reason,
-      error: error.message,
-    };
+    logger.error(`[Email] FAILED for recipient ${recipient}: ${reason}`);
+    return { delivered: false, reason, error: error.message };
   }
 };
 
-const escapeHtml = (value = '') =>
-  String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const escapeHtml = (value = "") =>
+  String(value).replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
 
 export const sendPasswordResetEmail = async ({ to, name, resetUrl }) =>
   sendMail({
     to,
-    subject: 'Reset your portal password',
+    subject: "Reset your portal password",
     text: `Hi ${name},\n\nWe received a request to reset your password. Open this link to choose a new one (valid for ${env.passwordResetExpiresMin} minutes):\n${resetUrl}\n\nIf you did not ask for this, you can ignore this email.`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#1f2937">
