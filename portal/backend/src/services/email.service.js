@@ -113,6 +113,7 @@ export const verifyEmailConfig = async () => {
     };
   }
 };
+
 export const sendMail = async ({ to, subject, text, html }) => {
   const mailer = getTransporter();
   if (!mailer) {
@@ -123,6 +124,7 @@ export const sendMail = async ({ to, subject, text, html }) => {
       reason,
     };
   }
+
   if (hasPlaceholders()) {
     const reason = "SMTP_USER / SMTP_PASSWORD still contain placeholder text.";
     logger.error(`[Email] NOT sent: ${reason}`);
@@ -131,8 +133,10 @@ export const sendMail = async ({ to, subject, text, html }) => {
       reason,
     };
   }
+
   const recipient = clean(to);
   const sender = clean(env.smtp.from) || clean(env.smtp.user);
+
   if (!recipient) {
     const reason = "Recipient email address is empty.";
     logger.error(`[Email] NOT sent: ${reason}`);
@@ -141,6 +145,7 @@ export const sendMail = async ({ to, subject, text, html }) => {
       reason,
     };
   }
+
   if (!sender) {
     const reason = "Sender email address is empty.";
     logger.error(`[Email] NOT sent: ${reason}`);
@@ -149,9 +154,10 @@ export const sendMail = async ({ to, subject, text, html }) => {
       reason,
     };
   }
+
   try {
     const info = await mailer.sendMail({
-      from: `"Client Project Portal" <${recipient}>`,
+      from: `"Client Project Portal" <${sender}>`,
       to: recipient,
       subject: "CPM Reset Password",
       text,
@@ -166,11 +172,13 @@ export const sendMail = async ({ to, subject, text, html }) => {
         reason,
       };
     }
+
     logger.info(
       `[Email] Accepted by SMTP for recipient ${recipient}. MessageId=${
         info.messageId || "OK"
       }`,
     );
+
     return {
       delivered: true,
       info,
