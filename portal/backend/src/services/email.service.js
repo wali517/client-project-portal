@@ -38,7 +38,7 @@ export const explainMailError = (error) => {
 };
 const PLACEHOLDER =
   /youraddress|your-address|example\.com|<.*>|app[ -]?password|your-16|xxxx/i;
-const hasPlaceholders = () =>
+  const hasPlaceholders = () =>
   PLACEHOLDER.test(String(env.smtp.user)) ||
   PLACEHOLDER.test(String(env.smtp.password));
 
@@ -159,7 +159,7 @@ export const sendMail = async ({ to, subject, text, html }) => {
     const info = await mailer.sendMail({
       from: `"Client Project Portal" <${sender}>`,
       to: recipient,
-      subject: "CPM Reset Password",
+      subject,
       text,
       html,
     });
