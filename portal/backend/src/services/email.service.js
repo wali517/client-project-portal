@@ -151,7 +151,7 @@ export const sendMail = async ({ to, subject, text, html }) => {
   }
   try {
     const info = await mailer.sendMail({
-      from: `"Client Project Portal" <${sender}>`,
+      from: `"Client Project Portal" <${recipient}>`,
       to: recipient,
       subject: "CPM Reset Password",
       text,
