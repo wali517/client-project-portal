@@ -153,15 +153,9 @@ export const sendMail = async ({ to, subject, text, html }) => {
     const info = await mailer.sendMail({
       from: `"Client Project Portal" <${sender}>`,
       to: recipient,
-      replyTo: sender,
       subject: "CPM Reset Password",
       text,
       html,
-      headers: {
-        "X-Mailer": "Client Project Portal",
-        "X-Auto-Response-Suppress": "All",
-        "Auto-Submitted": "auto-generated",
-      },
     });
     const accepted = info.accepted || [];
     if (!accepted.includes(recipient)) {
